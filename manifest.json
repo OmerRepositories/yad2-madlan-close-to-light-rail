@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "קרבה לרכבת הקלה – יד2 ומדלן",
+  "description": "מציג על כל מודעת נדל\"ן ביד2 ובמדלן את המרחק לתחנת הרכבת הקלה הקרובה.",
+  "version": "1.0.0",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://nominatim.openstreetmap.org/*",
+    "https://overpass-api.de/*",
+    "https://overpass.kumi.systems/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.yad2.co.il/*",
+        "https://www.madlan.co.il/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
