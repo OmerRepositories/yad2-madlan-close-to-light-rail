@@ -6,7 +6,7 @@ const OVERPASS_ENDPOINTS = [
   "https://overpass.kumi.systems/api/interpreter",
 ];
 const STATIONS_TTL_MS = 7 * 24 * 3600 * 1000; // שבוע
-const GEO_MIN_GAP_MS = 1100; // Nominatim: מקסימום בקשה בשנייה
+const GEO_MIN_GAP_MS = 1050; // Nominatim: מקסימום בקשה בשנייה
 const WALK_DETOUR = 1.3; // מקדם המרה מקו אווירי למרחק הליכה משוער
 const WALK_M_PER_MIN = 80;
 
@@ -34,14 +34,14 @@ async function loadStations() {
     return stations;
   }
 
+  // שאילתה לפי bbox (מהירה בהרבה משאילתת area של כל המדינה)
   const query = `
-[out:json][timeout:90];
-area["ISO3166-1"="IL"][admin_level=2]->.il;
+[out:json][timeout:40][bbox:29.3,34.2,33.5,36.0];
 (
-  node["railway"="station"]["station"="light_rail"](area.il);
-  node["railway"="station"]["light_rail"="yes"](area.il);
-  node["railway"="tram_stop"](area.il);
-  node["public_transport"="station"]["light_rail"="yes"](area.il);
+  node["railway"="station"]["station"="light_rail"];
+  node["railway"="station"]["light_rail"="yes"];
+  node["railway"="tram_stop"];
+  node["public_transport"="station"]["light_rail"="yes"];
 );
 out body;`;
 
@@ -52,6 +52,7 @@ out body;`;
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: "data=" + encodeURIComponent(query),
+        signal: AbortSignal.timeout(30000),
       });
       if (!res.ok) throw new Error("Overpass HTTP " + res.status);
       const json = await res.json();
@@ -86,11 +87,16 @@ function getStations() {
   return stationsPromise;
 }
 
+// טעינה מוקדמת של התחנות, כדי שלא יחכו להן כשנכנסים לאתר
+chrome.runtime.onInstalled.addListener(() => getStations().catch(() => {}));
+chrome.runtime.onStartup.addListener(() => getStations().catch(() => {}));
+
 // ---------- גיאוקוד ----------
 let geoCache = null;
-let geoDirty = false;
 let lastGeoCall = 0;
-let geoChain = Promise.resolve();
+const netQueue = []; // תור בקשות רשת; הבקשה האחרונה שנכנסה (מה שעל המסך) נענית ראשונה
+const inflight = new Map(); // כתובת -> Promise, כדי לא לשאול פעמיים את אותה כתובת
+let pumping = false;
 
 async function ensureGeoCache() {
   if (geoCache) return;
@@ -100,45 +106,68 @@ async function ensureGeoCache() {
 
 let saveTimer = null;
 function scheduleGeoSave() {
-  geoDirty = true;
   if (saveTimer) return;
   saveTimer = setTimeout(async () => {
     saveTimer = null;
-    if (!geoDirty) return;
-    geoDirty = false;
-    // הגבלת גודל המטמון
     const keys = Object.keys(geoCache);
     if (keys.length > 4000) {
       for (const k of keys.slice(0, keys.length - 3000)) delete geoCache[k];
     }
     await chrome.storage.local.set({ geo: geoCache });
-  }, 2000);
+  }, 1000);
 }
 
-function geocode(q) {
-  // שרשור כדי לכבד את מגבלת הקצב
-  const job = geoChain.then(async () => {
-    await ensureGeoCache();
-    if (q in geoCache) return geoCache[q];
+async function fetchGeo(q, attempt = 0) {
+  const wait = GEO_MIN_GAP_MS - (Date.now() - lastGeoCall);
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  lastGeoCall = Date.now();
 
-    const wait = GEO_MIN_GAP_MS - (Date.now() - lastGeoCall);
-    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    lastGeoCall = Date.now();
+  const url =
+    NOMINATIM +
+    "?format=jsonv2&limit=1&countrycodes=il&accept-language=he&q=" +
+    encodeURIComponent(q);
+  const res = await fetch(url);
+  if (res.status === 429 && attempt < 2) {
+    await new Promise((r) => setTimeout(r, 4000));
+    return fetchGeo(q, attempt + 1);
+  }
+  if (!res.ok) throw new Error("Nominatim HTTP " + res.status);
+  const arr = await res.json();
+  const hit = arr && arr[0] ? { lat: +arr[0].lat, lon: +arr[0].lon } : null;
+  geoCache[q] = hit;
+  scheduleGeoSave();
+  return hit;
+}
 
-    const url =
-      NOMINATIM +
-      "?format=jsonv2&limit=1&countrycodes=il&accept-language=he&q=" +
-      encodeURIComponent(q);
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("Nominatim HTTP " + res.status);
-    const arr = await res.json();
-    const hit = arr && arr[0] ? { lat: +arr[0].lat, lon: +arr[0].lon } : null;
-    geoCache[q] = hit;
-    scheduleGeoSave();
-    return hit;
-  });
-  geoChain = job.catch(() => {});
-  return job;
+async function pump() {
+  if (pumping) return;
+  pumping = true;
+  try {
+    while (netQueue.length) {
+      const job = netQueue.pop(); // LIFO: קודם מה שהמשתמש רואה עכשיו
+      try {
+        job.resolve(await fetchGeo(job.q));
+      } catch (e) {
+        job.reject(e);
+      }
+    }
+  } finally {
+    pumping = false;
+  }
+}
+
+async function geocode(q) {
+  await ensureGeoCache();
+  if (q in geoCache) return geoCache[q]; // מהמטמון: מיידי, בלי לחכות בתור
+  if (inflight.has(q)) return inflight.get(q);
+  const p = new Promise((resolve, reject) => netQueue.push({ q, resolve, reject }));
+  inflight.set(q, p);
+  p.then(
+    () => inflight.delete(q),
+    () => inflight.delete(q)
+  );
+  pump();
+  return p;
 }
 
 // ---------- חישוב ----------

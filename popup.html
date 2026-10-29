@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>הגדרות</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <h1>🚆 מה נחשב "מודעה שווה"?</h1>
+  <p class="hint">מודעה שעומדת בכל התנאים שסימנת תקבל מסגרת כתומה ותג ⭐</p>
+
+  <label class="row switch">
+    <input type="checkbox" id="highlight">
+    <span>להדגיש מודעות שוות</span>
+  </label>
+
+  <fieldset>
+    <legend>מחיר למ״ר</legend>
+
+    <label class="field">
+      <span>מחיר מקסימלי למ״ר (₪)</span>
+      <input type="number" id="maxPpsm" min="0" step="500" placeholder="למשל 30000">
+    </label>
+    <p class="small">השאר ריק או 0 כדי לא להגביל.</p>
+
+    <label class="field">
+      <span>זול מחציון הדף ב-% לפחות</span>
+      <input type="number" id="belowMedianPct" min="0" max="90" step="1" placeholder="למשל 10">
+    </label>
+    <p class="small">החציון מחושב על המודעות שבדף. 0 = לא פעיל.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>רכבת קלה</legend>
+
+    <label class="row switch">
+      <input type="checkbox" id="requireRail">
+      <span>לדרוש קרבה לרכבת</span>
+    </label>
+
+    <label class="field">
+      <span>מרחק מקסימלי מהתחנה (מטרים)</span>
+      <input type="number" id="nearM" min="100" step="50" placeholder="800">
+    </label>
+  </fieldset>
+
+  <div class="actions">
+    <button id="reset" type="button">איפוס לברירת מחדל</button>
+    <span id="status" aria-live="polite"></span>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
