@@ -9,6 +9,7 @@ const STATIONS_TTL_MS = 7 * 24 * 3600 * 1000; // שבוע
 const GEO_MIN_GAP_MS = 1050; // Nominatim: מקסימום בקשה בשנייה
 const WALK_DETOUR = 1.3; // מקדם המרה מקו אווירי למרחק הליכה משוער
 const WALK_M_PER_MIN = 80;
+const BIAS_DEG = 0.3; // ~30 ק"מ סביב אזור הדף, לשאילתות בלי עיר
 
 // ---------- עזרי מרחק ----------
 function haversine(lat1, lon1, lat2, lon2) {
@@ -95,7 +96,7 @@ chrome.runtime.onStartup.addListener(() => getStations().catch(() => {}));
 let geoCache = null;
 let lastGeoCall = 0;
 const netQueue = []; // תור בקשות רשת; הבקשה האחרונה שנכנסה (מה שעל המסך) נענית ראשונה
-const inflight = new Map(); // כתובת -> Promise, כדי לא לשאול פעמיים את אותה כתובת
+const inflight = new Map(); // מפתח -> Promise, כדי לא לשאול פעמיים את אותה כתובת
 let pumping = false;
 
 async function ensureGeoCache() {
@@ -117,24 +118,29 @@ function scheduleGeoSave() {
   }, 1000);
 }
 
-async function fetchGeo(q, attempt = 0) {
+async function fetchGeo(job, attempt = 0) {
   const wait = GEO_MIN_GAP_MS - (Date.now() - lastGeoCall);
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
   lastGeoCall = Date.now();
 
-  const url =
+  let url =
     NOMINATIM +
     "?format=jsonv2&limit=1&countrycodes=il&accept-language=he&q=" +
-    encodeURIComponent(q);
+    encodeURIComponent(job.q);
+  if (job.bias) {
+    const { lat, lon } = job.bias;
+    // viewbox: left,top,right,bottom – נותן עדיפות (לא מגביל) לאזור
+    url += `&viewbox=${lon - BIAS_DEG},${lat + BIAS_DEG},${lon + BIAS_DEG},${lat - BIAS_DEG}`;
+  }
   const res = await fetch(url);
   if (res.status === 429 && attempt < 2) {
     await new Promise((r) => setTimeout(r, 4000));
-    return fetchGeo(q, attempt + 1);
+    return fetchGeo(job, attempt + 1);
   }
   if (!res.ok) throw new Error("Nominatim HTTP " + res.status);
   const arr = await res.json();
   const hit = arr && arr[0] ? { lat: +arr[0].lat, lon: +arr[0].lon } : null;
-  geoCache[q] = hit;
+  geoCache[job.key] = hit;
   scheduleGeoSave();
   return hit;
 }
@@ -146,7 +152,7 @@ async function pump() {
     while (netQueue.length) {
       const job = netQueue.pop(); // LIFO: קודם מה שהמשתמש רואה עכשיו
       try {
-        job.resolve(await fetchGeo(job.q));
+        job.resolve(await fetchGeo(job));
       } catch (e) {
         job.reject(e);
       }
@@ -156,15 +162,19 @@ async function pump() {
   }
 }
 
-async function geocode(q) {
+async function geocode(q, bias) {
   await ensureGeoCache();
-  if (q in geoCache) return geoCache[q]; // מהמטמון: מיידי, בלי לחכות בתור
-  if (inflight.has(q)) return inflight.get(q);
-  const p = new Promise((resolve, reject) => netQueue.push({ q, resolve, reject }));
-  inflight.set(q, p);
+  // שאילתות עם הטיה מתויקות לפי האזור (עיגול ל-0.1 מעלה, ~10 ק"מ)
+  const key = bias ? `${q}|${bias.lat.toFixed(1)},${bias.lon.toFixed(1)}` : q;
+  if (key in geoCache) return geoCache[key]; // מהמטמון: מיידי, בלי לחכות בתור
+  if (inflight.has(key)) return inflight.get(key);
+  const p = new Promise((resolve, reject) =>
+    netQueue.push({ q, key, bias, resolve, reject })
+  );
+  inflight.set(key, p);
   p.then(
-    () => inflight.delete(q),
-    () => inflight.delete(q)
+    () => inflight.delete(key),
+    () => inflight.delete(key)
   );
   pump();
   return p;
@@ -180,17 +190,23 @@ function nearest(stations, lat, lon) {
   return best;
 }
 
-async function lookup(queries) {
+// queries: [{ q, approx, bias }]  (מחרוזת פשוטה גם נתמכת)
+async function lookup(queries, bias) {
   const stations = await getStations();
   for (let i = 0; i < queries.length; i++) {
-    const hit = await geocode(queries[i]);
+    const qi =
+      typeof queries[i] === "string"
+        ? { q: queries[i], approx: i > 0, bias: false }
+        : queries[i];
+    const hit = await geocode(qi.q, qi.bias ? bias : null);
     if (!hit) continue;
     const st = nearest(stations, hit.lat, hit.lon);
     if (!st) return { ok: false, reason: "no-stations" };
     const meters = Math.round(st.distance);
     return {
       ok: true,
-      approx: i > 0, // נפלנו חזרה לשכונה/עיר ולא לכתובת מדויקת
+      approx: Boolean(qi.approx), // הערכה לפי שכונה/עיר/רחוב בלי עיר
+      matched: qi.q,
       meters,
       walkMin: Math.max(1, Math.round((meters * WALK_DETOUR) / WALK_M_PER_MIN)),
       station: { name: st.name, lat: st.lat, lon: st.lon },
@@ -202,7 +218,7 @@ async function lookup(queries) {
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === "lookup" && Array.isArray(msg.queries)) {
-    lookup(msg.queries)
+    lookup(msg.queries, msg.bias || null)
       .then(sendResponse)
       .catch((err) => sendResponse({ ok: false, reason: "error", error: String(err) }));
     return true; // תשובה אסינכרונית
