@@ -198,12 +198,14 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 updateCacheStatus();
 
-$("exportListingCache").addEventListener("click", async () => {
-  const button = $("exportListingCache");
+async function exportListingCache(format) {
+  const buttons = [$("exportListingCacheCsv"), $("exportListingCacheExcel")];
   const status = $("exportStatus");
   const spinner = $("exportSpinner");
-  button.disabled = true;
-  button.setAttribute("aria-busy", "true");
+  buttons.forEach((button) => {
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+  });
   status.dataset.error = "false";
   status.textContent = "טוען נתוני מטמון…";
   spinner.hidden = false;
@@ -220,20 +222,32 @@ $("exportListingCache").addEventListener("click", async () => {
       });
     });
     const count = Object.keys(stored).length;
-    const csv = await LRCacheExport.buildCsv(stored, (complete, total) => {
+    const formatName = format === "excel" ? "Excel" : "CSV";
+    const progress = (complete, total) => {
       status.textContent = total
-        ? `מכין CSV… ${complete.toLocaleString("he-IL")} / ${total.toLocaleString("he-IL")}`
-        : "מכין קובץ CSV…";
-    });
-    LRCacheExport.downloadCsv(csv);
+        ? `מכין ${formatName}… ${complete.toLocaleString("he-IL")} / ${total.toLocaleString("he-IL")}`
+        : `מכין קובץ ${formatName}…`;
+    };
+    if (format === "excel") {
+      const excel = await LRCacheExport.buildExcel(stored, progress);
+      LRCacheExport.downloadExcel(excel);
+    } else {
+      const csv = await LRCacheExport.buildCsv(stored, progress);
+      LRCacheExport.downloadCsv(csv);
+    }
     status.textContent = `הייצוא הושלם · ${count.toLocaleString("he-IL")} מודעות`;
   } catch (error) {
     console.error("[lightrail-ext] failed to export listing cache", error);
     status.dataset.error = "true";
     status.textContent = "ייצוא הנתונים נכשל";
   } finally {
-    button.disabled = false;
-    button.removeAttribute("aria-busy");
+    buttons.forEach((button) => {
+      button.disabled = false;
+      button.removeAttribute("aria-busy");
+    });
     spinner.hidden = true;
   }
-});
+}
+
+$("exportListingCacheCsv").addEventListener("click", () => exportListingCache("csv"));
+$("exportListingCacheExcel").addEventListener("click", () => exportListingCache("excel"));

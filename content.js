@@ -691,7 +691,8 @@
     amenities,
     refreshTimestamp = false,
     coordinates = null,
-    listingUrl = null
+    listingUrl = null,
+    listingStats = null
   ) {
     const key = id ? cacheKeyForListing(id) : null;
     if (
@@ -704,6 +705,23 @@
     }
     const existing = listingCache[key];
     const validCoordinates = LRLocation.validCoordinates(coordinates) ? coordinates : null;
+    const stats = {};
+    for (const field of ["price", "sqm", "pricePerSqm"]) {
+      if (listingStats && Number.isFinite(listingStats[field])) {
+        stats[field] = listingStats[field];
+      }
+    }
+    if (
+      listingStats &&
+      Number.isFinite(listingStats.price) &&
+      Number.isFinite(listingStats.sqm) &&
+      !Number.isFinite(listingStats.pricePerSqm)
+    ) {
+      stats.pricePerSqm = null;
+    }
+    const statsUnchanged = Object.entries(stats).every(
+      ([field, value]) => existing && existing[field] === value
+    );
     if (
       existing &&
       Object.keys(amenities).every((amenity) => existing.amenities[amenity] === amenities[amenity]) &&
@@ -712,7 +730,8 @@
         (existing.coordinates &&
           existing.coordinates.lat === validCoordinates.lat &&
           existing.coordinates.lon === validCoordinates.lon)) &&
-      (!listingUrl || existing.url === listingUrl)
+      (!listingUrl || existing.url === listingUrl) &&
+      statsUnchanged
     ) {
       if (refreshTimestamp || Date.now() - existing.updatedAt >= 24 * 60 * 60 * 1000) {
         listingCache[key] = {
@@ -726,12 +745,14 @@
       return;
     }
     listingCache[key] = {
+      ...existing,
       amenities,
       ...(validCoordinates ? { coordinates: validCoordinates } : {}),
       ...(existing && validCachedCoordinates(existing) && !validCoordinates
         ? { coordinates: existing.coordinates }
         : {}),
       ...(listingUrl ? { url: listingUrl } : existing && existing.url ? { url: existing.url } : {}),
+      ...stats,
       updatedAt: Date.now(),
     };
     saveListingCache();
@@ -802,9 +823,13 @@
       const currentAmenities = (IS_YAD2 ? LRYad2 : LRMadlan).readAmenities(root);
       if (entry.kind === "single" && currentAmenities) {
         entry.amenities = currentAmenities;
+        const listingText = entry.getText();
+        const listingStats = IS_YAD2
+          ? LR.extractPriceSqm(listingText)
+          : LRMadlan.extractPriceSqm(root, listingText);
         const address = siteParser.readAddress(
           root,
-          entry.getText(),
+          listingText,
           ctxCity(),
           true
         );
@@ -818,7 +843,12 @@
             (!validCachedCoordinates(cachedListing) &&
               LRLocation.validCoordinates(address.coordinates)),
           address.coordinates,
-          siteParser.listingUrl(root)
+          siteParser.listingUrl(root),
+          {
+            price: listingStats.price,
+            sqm: listingStats.sqm,
+            pricePerSqm: listingStats.ppsm,
+          }
         );
         entry.cacheRefreshed = true;
       } else {

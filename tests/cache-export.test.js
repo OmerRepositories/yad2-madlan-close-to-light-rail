@@ -25,6 +25,25 @@ function parseCsvRow(line) {
   return cells;
 }
 
+async function readZipEntries(blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const view = new DataView(bytes.buffer);
+  const decoder = new TextDecoder();
+  const entries = new Map();
+  let offset = 0;
+  while (view.getUint32(offset, true) === 0x04034b50) {
+    const nameLength = view.getUint16(offset + 26, true);
+    const extraLength = view.getUint16(offset + 28, true);
+    const size = view.getUint32(offset + 18, true);
+    const nameStart = offset + 30;
+    const dataStart = nameStart + nameLength + extraLength;
+    const name = decoder.decode(bytes.slice(nameStart, nameStart + nameLength));
+    entries.set(name, decoder.decode(bytes.slice(dataStart, dataStart + size)));
+    offset = dataStart + size;
+  }
+  return entries;
+}
+
 test("CSV export includes every amenity flag, coordinates, URL, and arbitrary record data", async () => {
   const updatedAt = Date.UTC(2026, 9, 30);
   const csv = await CacheExport.buildCsv(
@@ -32,6 +51,9 @@ test("CSV export includes every amenity flag, coordinates, URL, and arbitrary re
       "yad2:ad-123": {
         amenities: { parking: true, secureRoom: false, newFlag: true },
         coordinates: { lat: 32.1, lon: 34.8 },
+        price: 2500000,
+        sqm: 100,
+        pricePerSqm: 25000,
         updatedAt,
         url: "https://www.yad2.co.il/realestate/item/center-and-sharon/ad-123",
         sourceNote: "owner said \"renovated\"",
@@ -58,10 +80,52 @@ test("CSV export includes every amenity flag, coordinates, URL, and arbitrary re
   assert.equal(yad2.amenity_newFlag, "true");
   assert.equal(yad2.latitude, "32.1");
   assert.equal(yad2.longitude, "34.8");
+  assert.equal(yad2.price, "2500000");
+  assert.equal(yad2.sqm, "100");
+  assert.equal(yad2.pricePerSqm, "25000");
   assert.equal(yad2.record_sourceNote, 'owner said "renovated"');
   assert.equal(JSON.parse(yad2.record_json).amenities.secureRoom, false);
   assert.equal(madlan.listing_url, "https://www.madlan.co.il/listings/ad-456");
   assert.equal(madlan.record_legacyField, "kept");
+});
+
+test("Excel export is a filtered XLSX with readable amenity colors and clickable listing URLs", async () => {
+  const updatedAt = Date.UTC(2026, 9, 30);
+  const workbook = await CacheExport.buildExcel(
+    {
+      "yad2:ad-123": {
+        amenities: { parking: true, secureRoom: false },
+        coordinates: { lat: 32.1, lon: 34.8 },
+        price: 2500000,
+        sqm: 100,
+        pricePerSqm: 25000,
+        updatedAt,
+        url: "https://www.yad2.co.il/realestate/item/ad-123",
+      },
+    },
+    () => {},
+    updatedAt
+  );
+  const files = await readZipEntries(workbook);
+  const sheet = files.get("xl/worksheets/sheet1.xml");
+  const links = files.get("xl/worksheets/_rels/sheet1.xml.rels");
+
+  assert.equal(
+    workbook.type,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  assert.ok(files.has("[Content_Types].xml"));
+  assert.ok(sheet.includes('<autoFilter ref="A1:T2"/>'));
+  assert.ok(sheet.includes('rightToLeft="1"'));
+  assert.ok(sheet.includes("מחיר (₪)"));
+  assert.ok(sheet.includes("<v>2500000</v>"));
+  assert.ok(sheet.includes("<v>100</v>"));
+  assert.ok(sheet.includes("<v>25000</v>"));
+  assert.ok(sheet.includes('s="2" t="inlineStr"><is><t>כן</t>'));
+  assert.ok(sheet.includes('s="3" t="inlineStr"><is><t>לא</t>'));
+  assert.ok(sheet.includes("<t>פתיחת מודעה ↗</t>"));
+  assert.ok(sheet.includes('<hyperlink ref="C2" r:id="rId1"/>'));
+  assert.ok(links.includes('Target="https://www.yad2.co.il/realestate/item/ad-123"'));
 });
 
 test("CSV export includes a safe Yad2 fallback URL and guards spreadsheet formulas", async () => {
