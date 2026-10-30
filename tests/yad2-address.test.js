@@ -91,12 +91,13 @@ test("Madlan project detail pages are recognized", () => {
   const projectAddress = {
     innerText: "יהושע שטמפפר 81, פתח תקווה",
   };
+  let hasProjectAddress = false;
   const madlanContext = {
     LR,
     document: {
       scripts: [],
       querySelector(selector) {
-        return selector === '[data-testid="project-address"]'
+        return hasProjectAddress && selector === '[data-testid="project-address"]'
           ? projectAddress
           : null;
       },
@@ -120,6 +121,9 @@ test("Madlan project detail pages are recognized", () => {
     madlanContext.LRMadlan.listingUrl(madlanContext.document),
     "https://www.madlan.co.il/listings/ad-456"
   );
+  assert.equal(madlanContext.LRMadlan.isProjectPage("/listings/ad-456"), false);
+  hasProjectAddress = true;
+  assert.equal(madlanContext.LRMadlan.isProjectPage("/listings/ad-456"), true);
   madlanContext.location.pathname = "/projects/example_project";
   madlanContext.location.href = "https://www.madlan.co.il/projects/example_project";
   const address = madlanContext.LRMadlan.readAddress(

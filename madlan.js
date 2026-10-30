@@ -35,7 +35,10 @@ var LRMadlan = (() => {
   }
 
   function isProjectPage(path) {
-    return /^\/projects\/[^/]+\/?$/.test(path);
+    return (
+      /^\/projects\/[^/]+\/?$/.test(path) ||
+      Boolean(document.querySelector('[data-testid="project-address"]'))
+    );
   }
 
   function decodeJsonString(value) {
