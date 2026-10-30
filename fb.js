@@ -156,17 +156,18 @@
     const m = res.meters;
     const state = m <= 600 ? "near" : m <= 1500 ? "mid" : "far";
     const walk = m > 4000 ? "" : `🚶 ~${res.walkMin} דק׳ הליכה · `;
-    b._open = () => {
-      const url =
-        "https://www.google.com/maps/dir/?api=1&travelmode=walking" +
-        `&origin=${res.origin.lat},${res.origin.lon}` +
-        `&destination=${res.station.lat},${res.station.lon}`;
-      window.open(url, "_blank", "noopener");
-    };
+    if (!res.approx) {
+      b._open = () => {
+        const url = LRLocation.mapsDirectionsUrl(res.origin, res.station);
+        window.open(url, "_blank", "noopener");
+      };
+    }
     setBadge(
       b, state, `${res.approx ? "≈" : ""}${fmtDistance(m)}`, `${walk}🚉 ${res.station.name}`,
       (res.approx ? "הערכה בלבד (" + res.matched + "). " : "") +
-        "קו אווירי לתחנה הקרובה. לחיצה פותחת כרטיסייה בגוגל מפות עם מסלול הליכה."
+        (res.approx
+          ? "קישור למפה לא זמין כדי לא להציג נקודת ציון לא מדויקת."
+          : "קו אווירי לתחנה הקרובה. לחיצה פותחת כרטיסייה בגוגל מפות עם מסלול הליכה.")
     );
   }
 

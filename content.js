@@ -283,18 +283,20 @@
     const sub = `${walk}🚉 ${res.station.name}`;
     const title =
       (res.approx
-        ? "הערכה בלבד – לא נמצאה כתובת מדויקת (" + res.matched + "). "
+        ? "הערכה בלבד – לא נמצאה כתובת מדויקת (" +
+          res.matched +
+          "). Google Maps לא ייפתח כדי לא להציג נקודה מטעה. "
         : "") +
-      "קו אווירי לתחנה הקרובה. לחיצה תפתח כרטיסייה חדשה בגוגל מפות עם מסלול הליכה מהכתובת לתחנה.";
+      (res.approx
+        ? "קו אווירי משוער לתחנה הקרובה."
+        : "קו אווירי לתחנה הקרובה. לחיצה תפתח כרטיסייה חדשה בגוגל מפות עם מסלול הליכה מהכתובת לתחנה.");
 
-    // קליק: כרטיסייה חדשה בגוגל מפות עם מסלול הליכה מהכתובת לתחנה
-    b._open = () => {
-      const url =
-        "https://www.google.com/maps/dir/?api=1&travelmode=walking" +
-        `&origin=${res.origin.lat},${res.origin.lon}` +
-        `&destination=${res.station.lat},${res.station.lon}`;
-      window.open(url, "_blank", "noopener");
-    };
+    if (!res.approx) {
+      b._open = () => {
+        const url = LRLocation.mapsDirectionsUrl(res.origin, res.station);
+        window.open(url, "_blank", "noopener");
+      };
+    }
     setBadge(b, state, `${res.approx ? "≈" : ""}${fmtDistance(m)}`, sub, title);
   }
 
@@ -306,9 +308,11 @@
 
     const attempt = () => {
       const text = entry.getText();
-      // בכרטיס רשימה הפורמט קבוע (מובנה), בדף מודעה בודדת צריך גם ניתוח חופשי
-      const { queries } = entry.kind === "single" ? LR.parseAny(text, ctxCity()) : LR.parseAddress(text, ctxCity());
-      if (!queries.length) {
+      const root = entry.kind === "single" ? document : entry.card;
+      const siteParser = IS_YAD2 ? LRYad2 : LRMadlan;
+      const parsed = siteParser.readAddress(root, text, ctxCity(), entry.kind === "single");
+      const { queries } = parsed;
+      if (!queries.length && !LRLocation.validCoordinates(parsed.coordinates)) {
         // ייתכן שהכרטיס עוד לא נטען במלואו – מנסים שוב כמה פעמים
         if (++entry.tries < maxTries) return setTimeout(attempt, 1000);
         renderRail(entry, { ok: false, reason: "not-found" });
@@ -318,7 +322,10 @@
       entry.tried = queries.map((q) => q.q);
       setBadge(entry.rail, "loading", "מחשב…");
       try {
-        chrome.runtime.sendMessage({ type: "lookup", queries, bias: pageBias }, (res) => {
+        const coordinates = LRLocation.validCoordinates(parsed.coordinates)
+          ? parsed.coordinates
+          : null;
+        chrome.runtime.sendMessage({ type: "lookup", queries, bias: pageBias, coordinates }, (res) => {
           if (chrome.runtime.lastError) {
             renderRail(entry, { ok: false, reason: "error", error: chrome.runtime.lastError.message });
           } else {
@@ -355,7 +362,10 @@
       if (!entry.info && entry.priceTries < 8 && now - entry.lastTry > 1500) {
         entry.priceTries++;
         entry.lastTry = now;
-        entry.parsed = LR.extractPriceSqm(entry.getText());
+        const text = entry.getText();
+        entry.parsed = IS_YAD2
+          ? LR.extractPriceSqm(text)
+          : LRMadlan.extractPriceSqm(entry.kind === "single" ? document : entry.card, text);
         entry.info = entry.parsed.ppsm ? entry.parsed : null;
       }
     }

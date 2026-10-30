@@ -125,7 +125,7 @@ async function fetchGeo(job, attempt = 0) {
 
   let url =
     NOMINATIM +
-    "?format=jsonv2&limit=1&countrycodes=il&accept-language=he&q=" +
+    "?format=jsonv2&addressdetails=1&limit=1&countrycodes=il&accept-language=he&q=" +
     encodeURIComponent(job.q);
   if (job.bias) {
     const { lat, lon } = job.bias;
@@ -139,7 +139,13 @@ async function fetchGeo(job, attempt = 0) {
   }
   if (!res.ok) throw new Error("Nominatim HTTP " + res.status);
   const arr = await res.json();
-  const hit = arr && arr[0] ? { lat: +arr[0].lat, lon: +arr[0].lon } : null;
+  let hit = arr && arr[0] ? { lat: +arr[0].lat, lon: +arr[0].lon } : null;
+  const requestedNumber = job.q.match(/\s(\d{1,4}\s*[א-ת]?)\s*(?=,|$)/);
+  if (hit && requestedNumber) {
+    const foundNumber = arr[0].address && arr[0].address.house_number;
+    const normalizeNumber = (value) => String(value || "").replace(/\s+/g, "").toLowerCase();
+    if (normalizeNumber(foundNumber) !== normalizeNumber(requestedNumber[1])) hit = null;
+  }
   geoCache[job.key] = hit;
   scheduleGeoSave();
   return hit;
@@ -165,7 +171,7 @@ async function pump() {
 async function geocode(q, bias) {
   await ensureGeoCache();
   // שאילתות עם הטיה מתויקות לפי האזור (עיגול ל-0.1 מעלה, ~10 ק"מ)
-  const key = bias ? `${q}|${bias.lat.toFixed(1)},${bias.lon.toFixed(1)}` : q;
+  const key = (bias ? `${q}|${bias.lat.toFixed(1)},${bias.lon.toFixed(1)}` : q) + "|house-check-v1";
   if (key in geoCache) return geoCache[key]; // מהמטמון: מיידי, בלי לחכות בתור
   if (inflight.has(key)) return inflight.get(key);
   const p = new Promise((resolve, reject) =>
@@ -191,8 +197,28 @@ function nearest(stations, lat, lon) {
 }
 
 // queries: [{ q, approx, bias }]  (מחרוזת פשוטה גם נתמכת)
-async function lookup(queries, bias) {
+async function lookup(queries, bias, coordinates) {
   const stations = await getStations();
+  if (
+    coordinates &&
+    Number.isFinite(coordinates.lat) &&
+    Number.isFinite(coordinates.lon) &&
+    Math.abs(coordinates.lat) <= 90 &&
+    Math.abs(coordinates.lon) <= 180
+  ) {
+    const st = nearest(stations, coordinates.lat, coordinates.lon);
+    if (!st) return { ok: false, reason: "no-stations" };
+    const meters = Math.round(st.distance);
+    return {
+      ok: true,
+      approx: false,
+      matched: "קואורדינטות המודעה",
+      meters,
+      walkMin: Math.max(1, Math.round((meters * WALK_DETOUR) / WALK_M_PER_MIN)),
+      station: { name: st.name, lat: st.lat, lon: st.lon },
+      origin: { lat: coordinates.lat, lon: coordinates.lon },
+    };
+  }
   for (let i = 0; i < queries.length; i++) {
     const qi =
       typeof queries[i] === "string"
@@ -218,7 +244,7 @@ async function lookup(queries, bias) {
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === "lookup" && Array.isArray(msg.queries)) {
-    lookup(msg.queries, msg.bias || null)
+    lookup(msg.queries, msg.bias || null, msg.coordinates || null)
       .then(sendResponse)
       .catch((err) => sendResponse({ ok: false, reason: "error", error: String(err) }));
     return true; // תשובה אסינכרונית
