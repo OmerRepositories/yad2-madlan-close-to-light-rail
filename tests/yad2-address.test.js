@@ -88,9 +88,19 @@ test("Yad2 first-hand project detail pages are recognized", () => {
 });
 
 test("Madlan project detail pages are recognized", () => {
+  const projectAddress = {
+    innerText: "יהושע שטמפפר 81, פתח תקווה",
+  };
   const madlanContext = {
     LR,
-    document: { scripts: [] },
+    document: {
+      scripts: [],
+      querySelector(selector) {
+        return selector.includes('[data-testid="project-address"]')
+          ? projectAddress
+          : null;
+      },
+    },
     URL,
     location: {
       pathname: "/listings/ad-456",
@@ -110,4 +120,15 @@ test("Madlan project detail pages are recognized", () => {
     madlanContext.LRMadlan.listingUrl(madlanContext.document),
     "https://www.madlan.co.il/listings/ad-456"
   );
+  madlanContext.location.pathname = "/projects/example_project";
+  madlanContext.location.href = "https://www.madlan.co.il/projects/example_project";
+  const address = madlanContext.LRMadlan.readAddress(
+    madlanContext.document,
+    "",
+    null,
+    true
+  );
+  assert.equal(address.street, "יהושע שטמפפר 81");
+  assert.equal(address.city, "פתח תקווה");
+  assert.ok(address.queries.some((query) => query.q === "יהושע שטמפפר 81, פתח תקווה"));
 });

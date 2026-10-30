@@ -98,7 +98,7 @@ var LRMadlan = (() => {
   function readAddress(root, text, ctxCity, single) {
     const data = listingData(root);
     const addressElement = root.querySelector(
-      '[data-auto="primary_address_text"], [data-testid="address"]'
+      '[data-auto="primary_address_text"], [data-testid="address"], [data-testid="project-address"]'
     );
     const addressText = addressElement ? addressElement.innerText : text;
     const parsed = single
