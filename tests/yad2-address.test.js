@@ -60,3 +60,15 @@ test("Yad2 does not replace a focused address with a conflicting house number", 
   assert.equal(parsed.street, "ביאליק 2");
   assert.equal(parsed.queries.some((query) => query.q === "ביאליק 3, פתח תקווה"), false);
 });
+
+test("city-only geocoding queries are explicitly marked as not being an address", () => {
+  const parsed = LR.parseAddress("", "פתח תקווה");
+
+  assert.equal(parsed.queries.length, 1);
+  assert.deepEqual(parsed.queries[0], {
+    q: "פתח תקווה",
+    approx: true,
+    bias: false,
+    cityOnly: true,
+  });
+});

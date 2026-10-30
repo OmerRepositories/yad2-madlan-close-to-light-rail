@@ -492,7 +492,7 @@
       setBadge(
         b,
         "none",
-        err ? "שגיאה בחישוב" : "לא נמצאה כתובת",
+        err ? "שגיאה בחישוב" : res && res.message ? res.message : "לא נמצאה כתובת",
         "",
         (err && res.error ? res.error + "\n" : "") + tried
       );
@@ -560,6 +560,15 @@
           : validCachedCoordinates(cachedListing)
             ? cachedListing.coordinates
             : null;
+        if (!coordinates && queries.every((query) => query.cityOnly)) {
+          renderRail(entry, {
+            ok: false,
+            reason: "not-found",
+            message: "לא אותרה כתובת",
+          });
+          scheduleRefresh();
+          return;
+        }
         chrome.runtime.sendMessage({ type: "lookup", queries, bias: pageBias, coordinates }, (res) => {
           if (!isRunning || !CFG.calculateRail || !entry.card.isConnected) return;
           if (chrome.runtime.lastError) {

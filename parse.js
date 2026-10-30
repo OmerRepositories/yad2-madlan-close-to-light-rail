@@ -100,8 +100,8 @@ var LR = (() => {
   // מחזיר [{ q, approx, bias }] לפי סדר עדיפות.
   function buildQueries({ street, ctx, city, hood, allowCityOnly = true }) {
     const queries = [];
-    const add = (q, approx = false, bias = false) => {
-      if (q && !queries.some((x) => x.q === q)) queries.push({ q, approx, bias });
+    const add = (q, approx = false, bias = false, cityOnly = false) => {
+      if (q && !queries.some((x) => x.q === q)) queries.push({ q, approx, bias, ...(cityOnly ? { cityOnly: true } : {}) });
     };
     const st = street ? normStreet(street) : null;
     if (st) {
@@ -121,7 +121,7 @@ var LR = (() => {
     if (hood && (ctx || city)) add(`${hood}, ${ctx || city}`, true);
     if (!st && !hood && allowCityOnly) {
       const c = city || ctx;
-      if (c) add(c, true);
+      if (c) add(c, true, false, true);
     }
     return queries.slice(0, 6);
   }
