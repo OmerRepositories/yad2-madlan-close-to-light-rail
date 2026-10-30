@@ -712,6 +712,13 @@
       return;
     }
     const existing = listingCache[key];
+    const existingAmenities =
+      existing &&
+      existing.amenities &&
+      typeof existing.amenities === "object" &&
+      !Array.isArray(existing.amenities)
+        ? existing.amenities
+        : {};
     const validCoordinates = LRLocation.validCoordinates(coordinates) ? coordinates : null;
     const stats = {};
     for (const field of ["price", "sqm", "pricePerSqm"]) {
@@ -732,8 +739,10 @@
     );
     if (
       existing &&
-      Object.keys(amenities).every((amenity) => existing.amenities[amenity] === amenities[amenity]) &&
-      Object.keys(existing.amenities).length === Object.keys(amenities).length &&
+      Object.keys(amenities).every(
+        (amenity) => existingAmenities[amenity] === amenities[amenity]
+      ) &&
+      Object.keys(existingAmenities).length === Object.keys(amenities).length &&
       (!validCoordinates ||
         (existing.coordinates &&
           existing.coordinates.lat === validCoordinates.lat &&
