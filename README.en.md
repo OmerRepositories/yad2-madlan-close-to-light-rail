@@ -49,6 +49,7 @@ In Facebook groups and feeds, the extension tries to identify properties offered
 - **Address**: a street and house number, optionally with a city, for example `הרצל 12 פתח תקווה`
 - Rental posts are excluded from purchase analysis. Phrases such as “for rent,” “monthly rent,” or “per month,” as well as a low currency amount typical of rent (for example `₪7,700`), produce a notice that the rental is not relevant to a purchase search.
 - “Looking for an apartment/property” posts are excluded and receive a separate notice.
+- Marketing copy such as “Looking for your next home?” does not override a clear sale listing marked “for sale” or “direct private sale.”
 - Phone numbers are not treated as prices.
 - Facebook distance is calculated only when a street and house number are explicitly identified (for example, `רחוב צה״ל 30`). A city alone or a street without a number is not used to guess an address, to avoid misleading locations.
 - If price, area, or address is missing, the badge indicates what could not be found.

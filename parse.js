@@ -405,12 +405,31 @@ var LR = (() => {
   function classifyFacebookPost(text) {
     const source = normQuotes(text);
     const seeking =
-      /מחפש(?:ת|ים|ות)?\s+(?:(?:.{1,35}?)\s+)?(?:דירה|דירות|נכס|נכסים|בית|בתים|לשכור|לקנות|לרכוש|שותף|שותפים)/.test(
+      /מחפש(?:ת|ים|ות)?\s+(?:(?:.{1,35}?)\s+)?(?:דירה|דירות|נכס|נכסים|בית|בתים|יחיד(?:ה|ת)(?:\s+דיור)?|קרקע|מגרש|חדרים?|לשכור|לקנות|לרכוש|שותף|שותפים)/.test(
         source
       );
+
+    const explicitlyForSale =
+      /למכירה|למכור|מוכר(?:ת)?\s+(?:דירה|נכס|בית)|מכירה\s+(?:ישירה|מפרטי|פרטית)/.test(
+        source
+      );
+    const clearSellerLanguage =
+      /מפרטי|ללא\s+תיווך|מכירה\s+ישירה|לפרטים\s*(?:נוספים)?|תיאום\s+(?:ביקור|סיור)|חייגו|התקשרו|שלחו\s+הודעה/.test(
+        source
+      );
+    if (explicitlyForSale && (!seeking || clearSellerLanguage)) {
+      const property =
+        /דירה|דירת|חדרים|חד'|פנטהאוז|דופלקס|מ"ר|מ'ר|\bמר\b|למכירה|נכס|קוטג|בית\b/.test(
+          source
+        );
+      const parsed = extractPriceSqmFree(source);
+      if (property && (parsed.price || parsed.sqm)) {
+        return { type: "listing", parsed };
+      }
+    }
+
     if (seeking) return { type: "seeking" };
 
-    const explicitlyForSale = /למכירה|למכור|מוכר(?:ת)?\s+(?:דירה|נכס|בית)/.test(source);
     const explicitlyForRent =
       /להשכרה|השכרה|שכר\s*דירה|שכ"ד|שכירות|לחודש|\/\s*חודש|בחודש|דמי\s*שכירות|סאבלט/.test(
         source
