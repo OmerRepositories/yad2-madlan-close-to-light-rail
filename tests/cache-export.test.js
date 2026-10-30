@@ -56,6 +56,10 @@ test("CSV export includes every amenity flag, coordinates, URL, and arbitrary re
         pricePerSqm: 25000,
         updatedAt,
         url: "https://www.yad2.co.il/realestate/item/center-and-sharon/ad-123",
+        railMeters: 460,
+        railApprox: true,
+        railStation: "שטמפפר",
+        brokerage: false,
         sourceNote: "owner said \"renovated\"",
       },
       "madlan:ad-456": {
@@ -83,6 +87,11 @@ test("CSV export includes every amenity flag, coordinates, URL, and arbitrary re
   assert.equal(yad2.price, "2500000");
   assert.equal(yad2.sqm, "100");
   assert.equal(yad2.pricePerSqm, "25000");
+  assert.equal(yad2.record_type, "listing");
+  assert.equal(yad2.railMeters, "460");
+  assert.equal(yad2.railApprox, "true");
+  assert.equal(yad2.railStation, "שטמפפר");
+  assert.equal(yad2.brokerage, "false");
   assert.equal(yad2.record_sourceNote, 'owner said "renovated"');
   assert.equal(JSON.parse(yad2.record_json).amenities.secureRoom, false);
   assert.equal(madlan.listing_url, "https://www.madlan.co.il/listings/ad-456");
@@ -96,11 +105,23 @@ test("Excel export is a filtered XLSX with readable amenity colors and clickable
       "yad2:ad-123": {
         amenities: { parking: true, secureRoom: false },
         coordinates: { lat: 32.1, lon: 34.8 },
-        price: 2500000,
+        recordType: "project",
+        title: "פרויקט שטמפפר",
+        address: "יהושע שטמפפר 81, פתח תקווה",
+        city: "פתח תקווה",
+        neighborhood: "שיפר",
+        price: 1790000,
+        maxPrice: 1790000,
         sqm: 100,
+        maxSqm: 120,
         pricePerSqm: 25000,
+        rooms: 5,
+        railMeters: 420,
+        railApprox: true,
+        railStation: "תחנת שטמפפר",
+        brokerage: true,
         updatedAt,
-        url: "https://www.yad2.co.il/realestate/item/ad-123",
+        url: "https://www.yad2.co.il/yad1/project/18636",
       },
     },
     () => {},
@@ -115,17 +136,26 @@ test("Excel export is a filtered XLSX with readable amenity colors and clickable
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   );
   assert.ok(files.has("[Content_Types].xml"));
-  assert.ok(sheet.includes('<autoFilter ref="A1:T2"/>'));
+  assert.ok(sheet.includes('<autoFilter ref="A1:AF2"/>'));
   assert.ok(sheet.includes('rightToLeft="1"'));
-  assert.ok(sheet.includes("מחיר (₪)"));
-  assert.ok(sheet.includes("<v>2500000</v>"));
+  assert.ok(sheet.includes("מזהה מודעה/פרויקט"));
+  assert.ok(sheet.includes("מחיר / החל מ׳ (₪)"));
+  assert.ok(sheet.includes("פתח תקווה"));
+  assert.ok(sheet.includes("<t>פרויקט</t>"));
+  assert.ok(sheet.includes("מרחק מהרכבת (מ׳)"));
+  assert.ok(sheet.includes("<v>420</v>"));
+  assert.ok(sheet.includes("<t>תחנת שטמפפר</t>"));
+  assert.ok(sheet.includes("תיווך?"));
+  assert.ok(sheet.includes('<c r="U2" s="3" t="inlineStr"><is><t>כן</t>'));
+  assert.ok(sheet.includes('<c r="S2" t="inlineStr"><is><t>כן</t>'));
+  assert.ok(sheet.includes("<v>1790000</v>"));
   assert.ok(sheet.includes("<v>100</v>"));
   assert.ok(sheet.includes("<v>25000</v>"));
   assert.ok(sheet.includes('s="2" t="inlineStr"><is><t>כן</t>'));
   assert.ok(sheet.includes('s="3" t="inlineStr"><is><t>לא</t>'));
-  assert.ok(sheet.includes("<t>פתיחת מודעה ↗</t>"));
-  assert.ok(sheet.includes('<hyperlink ref="C2" r:id="rId1"/>'));
-  assert.ok(links.includes('Target="https://www.yad2.co.il/realestate/item/ad-123"'));
+  assert.ok(sheet.includes("<t>פתיחת פרויקט ↗</t>"));
+  assert.ok(sheet.includes('<hyperlink ref="D2" r:id="rId1"/>'));
+  assert.ok(links.includes('Target="https://www.yad2.co.il/yad1/project/18636"'));
 });
 
 test("CSV export includes a safe Yad2 fallback URL and guards spreadsheet formulas", async () => {

@@ -64,6 +64,22 @@ test("Yad2 does not replace a focused address with a conflicting house number", 
   assert.equal(parsed.queries.some((query) => query.q === "ביאליק 3, פתח תקווה"), false);
 });
 
+test("Yad2 search cards preserve the displayed house number when structured data omits it", () => {
+  const parsed = readCardAddress(
+    "מיכל לייב כץ 64",
+    [
+      "₪ 2,650,000",
+      "מיכל לייב כץ 64",
+      "דירה, כפר גנים ב, פתח תקווה",
+      "4.5 חדרים • קומה 2 • 110 מ״ר",
+    ].join("\n")
+  );
+
+  assert.equal(parsed.street, "מיכל לייב כץ 64");
+  assert.equal(parsed.city, "פתח תקווה");
+  assert.ok(parsed.queries.some((query) => query.q === "מיכל לייב כץ 64, פתח תקווה"));
+});
+
 test("city-only geocoding queries are explicitly marked as not being an address", () => {
   const parsed = LR.parseAddress("", "פתח תקווה");
 
@@ -112,7 +128,28 @@ test("Yad2 project pages use the project address and exact coordinates", () => {
         if (selector === 'script#__NEXT_DATA__') {
           return {
             textContent: JSON.stringify({
-              props: { pageProps: { grayProject: project } },
+              props: {
+                pageProps: {
+                  grayProject: project,
+                  project: {
+                    token: "18636",
+                    projectName: "שטמפפר 81",
+                    address: {
+                      display: "יהושע שטמפפר 81, פתח תקווה",
+                      city: { text: "פתח תקווה" },
+                      neighborhood: { text: "שיפר" },
+                      coords: { lat: 32.094394, lon: 34.891279 },
+                    },
+                    additionalDetails: {
+                      minPrice: 1790000,
+                      maxPrice: 1790000,
+                      minSquaremeter: 47,
+                      maxSquaremeter: 120,
+                      roomsCount: 5,
+                    },
+                  },
+                },
+              },
             }),
           };
         }
@@ -128,6 +165,13 @@ test("Yad2 project pages use the project address and exact coordinates", () => {
     querySelector(selector) {
       return selector === '[data-testid="project-address"]' ? projectAddress : null;
     },
+  };
+  root.querySelector = (selector) => {
+    if (selector === '[data-testid="project-address"]') return projectAddress;
+    if (selector === '[data-testid="project-title"], h1') {
+      return { innerText: "פרויקט שטמפפר 81 פתח תקווה" };
+    }
+    return null;
   };
 
   const parsed = projectContext.LRYad2.readAddress(
@@ -149,6 +193,15 @@ test("Yad2 project pages use the project address and exact coordinates", () => {
     parsed.queries.some((query) => query.q.includes("פרויקטים חדשים")),
     false
   );
+  const projectExport = projectContext.LRYad2.projectExportData(root, "text");
+  assert.equal(projectExport.id, "18636");
+  assert.equal(projectExport.recordType, "project");
+  assert.equal(projectExport.price, 1790000);
+  assert.equal(projectExport.maxPrice, 1790000);
+  assert.equal(projectExport.sqm, 47);
+  assert.equal(projectExport.maxSqm, 120);
+  assert.equal(projectExport.pricePerSqm, Math.round(1790000 / 47));
+  assert.equal(projectExport.rooms, 5);
 });
 
 test("Madlan project detail pages are recognized", () => {

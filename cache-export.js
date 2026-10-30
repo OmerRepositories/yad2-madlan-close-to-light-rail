@@ -17,16 +17,28 @@ var LRCacheExport = (() => {
   const BASE_COLUMNS = [
     "cache_key",
     "site",
+    "record_type",
     "listing_id",
     "listing_url",
+    "title",
+    "address",
+    "city",
+    "neighborhood",
     "updated_at",
     "updated_at_iso",
     "is_expired",
     "latitude",
     "longitude",
     "price",
+    "maxPrice",
     "sqm",
+    "maxSqm",
     "pricePerSqm",
+    "rooms",
+    "railMeters",
+    "railApprox",
+    "railStation",
+    "brokerage",
   ];
 
   function parseCacheKey(key) {
@@ -79,7 +91,33 @@ var LRCacheExport = (() => {
     for (const [, record] of records) {
       for (const key of Object.keys(record.amenities || {})) amenityKeys.add(key);
       for (const key of Object.keys(record)) {
-        if (!["amenities", "coordinates", "updatedAt", "url", "listingUrl", "href", "link"].includes(key)) {
+        if (
+          ![
+            "amenities",
+            "coordinates",
+            "updatedAt",
+            "url",
+            "listingUrl",
+            "href",
+            "link",
+            "recordType",
+            "title",
+            "address",
+            "city",
+            "neighborhood",
+            "price",
+            "maxPrice",
+            "sqm",
+            "maxSqm",
+            "pricePerSqm",
+            "ppsm",
+            "rooms",
+            "railMeters",
+            "railApprox",
+            "railStation",
+            "brokerage",
+          ].includes(key)
+        ) {
           extraFields.add(key);
         }
       }
@@ -106,16 +144,28 @@ var LRCacheExport = (() => {
       const row = [
         key,
         site,
+        record.recordType === "project" ? "project" : "listing",
         listingId,
         recordUrl(site, listingId, record),
+        record.title,
+        record.address,
+        record.city,
+        record.neighborhood,
         timestamp,
         timestamp ? new Date(timestamp).toISOString() : "",
         timestamp ? now - timestamp >= 60 * 24 * 60 * 60 * 1000 : "",
         coordinates.lat,
         coordinates.lon,
         record.price,
+        record.maxPrice,
         record.sqm,
+        record.maxSqm,
         record.pricePerSqm ?? record.ppsm,
+        record.rooms,
+        record.railMeters,
+        record.railApprox,
+        record.railStation,
+        record.brokerage,
         ...amenities.map((amenity) => record.amenities && record.amenities[amenity]),
         record.amenities,
         record.coordinates,
@@ -162,14 +212,32 @@ var LRCacheExport = (() => {
   };
   const EXCEL_COLUMNS = [
     { key: "site", label: "אתר" },
-    { key: "listingId", label: "מזהה מודעה" },
-    { key: "listingUrl", label: "קישור למודעה", width: 42, hyperlink: true },
+    { key: "recordType", label: "סוג", width: 14 },
+    { key: "listingId", label: "מזהה מודעה/פרויקט" },
+    { key: "listingUrl", label: "קישור למודעה/פרויקט", width: 42, hyperlink: true },
+    { key: "title", label: "שם מודעה/פרויקט", width: 32 },
+    { key: "address", label: "כתובת", width: 32 },
+    { key: "city", label: "עיר", width: 18 },
+    { key: "neighborhood", label: "שכונה", width: 18 },
     { key: "updatedAt", label: "עודכן בתאריך", width: 22 },
-    { key: "price", label: "מחיר (₪)", width: 16 },
-    { key: "sqm", label: "שטח (מ״ר)", width: 14 },
+    { key: "price", label: "מחיר / החל מ׳ (₪)", width: 18 },
+    { key: "maxPrice", label: "מחיר עד (₪)", width: 16 },
+    { key: "sqm", label: "שטח / החל מ׳ (מ״ר)", width: 18 },
+    { key: "maxSqm", label: "שטח עד (מ״ר)", width: 16 },
     { key: "pricePerSqm", label: "מחיר למ״ר (₪)", width: 18 },
+    { key: "rooms", label: "חדרים", width: 12 },
     { key: "latitude", label: "קו רוחב", width: 14 },
     { key: "longitude", label: "קו אורך", width: 14 },
+    { key: "railMeters", label: "מרחק מהרכבת (מ׳)", width: 22 },
+    { key: "railApprox", label: "מרחק הרכבת משוער?", width: 18, booleanYesNo: true },
+    { key: "railStation", label: "תחנה קרובה", width: 24 },
+    {
+      key: "brokerage",
+      label: "תיווך?",
+      width: 12,
+      booleanYesNo: true,
+      reverseBooleanColors: true,
+    },
   ];
 
   function xmlEscape(value) {
@@ -279,14 +347,26 @@ var LRCacheExport = (() => {
         : "";
       const values = {
         site: site === "yad2" ? "יד2" : site === "madlan" ? "מדלן" : site,
+        recordType: record.recordType === "project" ? "פרויקט" : "מודעה",
         listingId,
         listingUrl: recordUrl(site, listingId, record),
+        title: record.title,
+        address: record.address,
+        city: record.city,
+        neighborhood: record.neighborhood,
         updatedAt: timestamp,
         price: record.price,
+        maxPrice: record.maxPrice,
         sqm: record.sqm,
+        maxSqm: record.maxSqm,
         pricePerSqm: record.pricePerSqm ?? record.ppsm,
+        rooms: record.rooms,
         latitude: coordinates.lat,
         longitude: coordinates.lon,
+        railMeters: record.railMeters,
+        railApprox: record.railApprox,
+        railStation: record.railStation,
+        brokerage: record.brokerage,
       };
       for (const column of columns) {
         if (column.amenity) values[column.key] = record.amenities?.[column.amenity];
@@ -298,10 +378,16 @@ var LRCacheExport = (() => {
         if (column.hyperlink && value) {
           const relationshipId = `rId${links.length + 1}`;
           links.push({ id: relationshipId, target: value, reference });
-          return `<c r="${reference}" s="4" t="inlineStr"><is><t>פתיחת מודעה ↗</t></is></c>`;
+          const label = values.recordType === "פרויקט" ? "פתיחת פרויקט ↗" : "פתיחת מודעה ↗";
+          return `<c r="${reference}" s="4" t="inlineStr"><is><t>${label}</t></is></c>`;
         }
-        if (column.amenity && typeof value === "boolean") {
-          return `<c r="${reference}" s="${value ? 2 : 3}" t="inlineStr"><is><t>${value ? "כן" : "לא"}</t></is></c>`;
+        if ((column.amenity || column.key === "brokerage") && typeof value === "boolean") {
+          const affirmativeStyle = column.reverseBooleanColors ? 3 : 2;
+          const negativeStyle = column.reverseBooleanColors ? 2 : 3;
+          return `<c r="${reference}" s="${value ? affirmativeStyle : negativeStyle}" t="inlineStr"><is><t>${value ? "כן" : "לא"}</t></is></c>`;
+        }
+        if (column.booleanYesNo && typeof value === "boolean") {
+          return `<c r="${reference}" t="inlineStr"><is><t>${value ? "כן" : "לא"}</t></is></c>`;
         }
         if (typeof value === "number" && Number.isFinite(value)) {
           return `<c r="${reference}" s="${column.key === "price" || column.key === "pricePerSqm" ? 5 : 0}" t="n"><v>${value}</v></c>`;

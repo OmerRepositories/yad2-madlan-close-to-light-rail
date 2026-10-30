@@ -29,6 +29,7 @@
     removeProjects: false,
     disableYad2: false,
     disableMadlan: false,
+    saveListingData: true,
     requiredAmenities: ["secureRoom"],
   };
   const CFG = {
@@ -520,6 +521,7 @@
       return;
     }
 
+    rememberExportMetrics(entry, res);
     const m = res.meters;
     const state = m <= 600 ? "near" : m <= 1500 ? "mid" : "far";
     const walk = m > 4000 ? "" : `🚶 ~${res.walkMin} דק׳ הליכה · `;
@@ -662,16 +664,21 @@
 
   function trimListingCache(cache, now = Date.now()) {
     const fresh = Object.entries(cache || {}).filter(([, record]) =>
-      validCachedAmenities(record, now)
+      record && (record.recordType === "project" || record.recordType === "listing")
+        ? Number.isFinite(record.updatedAt) &&
+          now - record.updatedAt < LISTING_CACHE_TTL_MS
+        : validCachedAmenities(record, now)
     );
     fresh.sort((a, b) => b[1].updatedAt - a[1].updatedAt);
     return Object.fromEntries(fresh.slice(0, LISTING_CACHE_MAX_ITEMS));
   }
 
   function saveListingCache() {
+    if (!CFG.saveListingData) return;
     clearTimeout(cacheSaveTimer);
     cacheSaveTimer = setTimeout(() => {
       cacheSaveTimer = null;
+      if (!CFG.saveListingData) return;
       if (!listingCacheLoaded) {
         pendingCacheSave = true;
         return;
@@ -696,6 +703,7 @@
   ) {
     const key = id ? cacheKeyForListing(id) : null;
     if (
+      !CFG.saveListingData ||
       !id ||
       cacheWriteSuppressedIds.has(key) ||
       !amenities ||
@@ -758,6 +766,87 @@
     saveListingCache();
   }
 
+  function rememberProjectData(project) {
+    if (!CFG.saveListingData || !listingCacheLoaded || !project || !project.id) return;
+    const id = `project-${project.id}`;
+    const key = cacheKeyForListing(id);
+    if (cacheWriteSuppressedIds.has(key)) return;
+    const existing = listingCache[key] || {};
+    const record = {
+      ...existing,
+      ...project,
+      recordType: "project",
+      updatedAt: existing.updatedAt || Date.now(),
+    };
+    const unchanged = Object.entries(record).every(
+      ([field, value]) => field === "updatedAt" || existing[field] === value
+    );
+    if (unchanged) return;
+    record.updatedAt = Date.now();
+    listingCache[key] = record;
+    saveListingCache();
+  }
+
+  function rememberExportMetrics(entry, result) {
+    if (!CFG.saveListingData || !listingCacheLoaded || !result || !result.ok) return;
+    const metrics = {
+      railMeters: Number.isFinite(result.meters) ? result.meters : null,
+      railApprox: Boolean(result.approx),
+      railStation: result.station && result.station.name ? result.station.name : "",
+    };
+    if (entry.projectPage) {
+      const parser = IS_YAD2 ? LRYad2 : LRMadlan;
+      const project = parser.projectExportData(document, entry.getText());
+      if (project) rememberProjectData({ ...project, ...metrics });
+      return;
+    }
+
+    rememberListingExportData(entry, metrics);
+  }
+
+  function rememberListingExportData(entry, extra = {}) {
+    if (!CFG.saveListingData || !listingCacheLoaded) return;
+    const parser = IS_YAD2 ? LRYad2 : LRMadlan;
+    const root = entry.kind === "single" ? document : entry.card;
+    const id = parser.listingId(root);
+    if (!id) return;
+    const key = cacheKeyForListing(id);
+    if (cacheWriteSuppressedIds.has(key)) return;
+    const previous = listingCache[key] || {};
+    const text = entry.getText();
+    const stats =
+      entry.parsed ||
+      (IS_YAD2 ? LR.extractPriceSqm(text) : LRMadlan.extractPriceSqm(root, text));
+    const address = parser.readAddress(root, text, ctxCity(), entry.kind === "single");
+    const listingHeading =
+      root.querySelector("h1") ||
+      (entry.kind === "list" ? root.querySelector('[data-testid="ad-card-title"]') : null);
+    const record = {
+      ...previous,
+      recordType: "listing",
+      title: (listingHeading && listingHeading.innerText.trim()) || previous.title || "",
+      address: [address.street, address.city].filter(Boolean).join(", "),
+      city: address.city || "",
+      neighborhood: address.hood || "",
+      url: parser.listingUrl(root) || previous.url || "",
+      coordinates: LRLocation.validCoordinates(address.coordinates)
+        ? address.coordinates
+        : previous.coordinates,
+      price: Number.isFinite(stats.price) ? stats.price : previous.price,
+      sqm: Number.isFinite(stats.sqm) ? stats.sqm : previous.sqm,
+      pricePerSqm: Number.isFinite(stats.ppsm) ? stats.ppsm : previous.pricePerSqm,
+      brokerage: hasBrokerageSignal(root),
+      ...extra,
+    };
+    const unchanged = Object.entries(record).every(
+      ([field, value]) => field === "updatedAt" || previous[field] === value
+    );
+    if (unchanged) return;
+    record.updatedAt = Date.now();
+    listingCache[key] = record;
+    saveListingCache();
+  }
+
   function renderCachedAmenities(entry) {
     if (entry.kind !== "list" || !entry.cacheNote) return;
     const record = entry.listingId ? listingCache[cacheKeyForListing(entry.listingId)] : null;
@@ -797,6 +886,10 @@
         continue;
       }
       if (entry.projectPage) {
+        if (CFG.saveListingData && listingCacheLoaded) {
+          const projectParser = IS_YAD2 ? LRYad2 : LRMadlan;
+          rememberProjectData(projectParser.projectExportData(document, entry.getText()));
+        }
         entry.ppsm.hidden = true;
         entry.deal.hidden = true;
         entry.amenityAlert.hidden = true;
@@ -821,6 +914,7 @@
       const siteParser = IS_YAD2 ? LRYad2 : LRMadlan;
       entry.listingId = siteParser.listingId(root);
       const currentAmenities = (IS_YAD2 ? LRYad2 : LRMadlan).readAmenities(root);
+      if (entry.kind === "single") rememberListingExportData(entry);
       if (entry.kind === "single" && currentAmenities) {
         entry.amenities = currentAmenities;
         const listingText = entry.getText();

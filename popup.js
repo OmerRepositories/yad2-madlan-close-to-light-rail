@@ -13,6 +13,7 @@ const DEFAULTS = {
   disableYad2: false,
   disableMadlan: false,
   disableFacebook: false,
+  saveListingData: true,
   requiredAmenities: ["secureRoom"],
 };
 
@@ -73,6 +74,7 @@ const boolKeys = [
   "disableYad2",
   "disableMadlan",
   "disableFacebook",
+  "saveListingData",
 ];
 
 function fill(s) {

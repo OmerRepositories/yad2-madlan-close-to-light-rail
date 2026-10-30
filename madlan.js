@@ -45,6 +45,29 @@ var LRMadlan = (() => {
     return /^\/projects-for-(?:sale|rent)(?:\/|$)/i.test(path);
   }
 
+  function projectExportData(root, text) {
+    if (!isProjectPage(location.pathname)) return null;
+    const id = location.pathname.match(/^\/projects\/([^/]+)\/?$/);
+    const addressElement = root.querySelector('[data-testid="project-address"]');
+    const titleElement = root.querySelector('[data-testid="project-title"], h1');
+    const address = addressElement ? addressElement.innerText.trim() : "";
+    const parsedAddress = LR.parseAddress(address, null);
+    const stats = LR.extractPriceSqm(text);
+    return {
+      id: id ? id[1] : location.pathname.split("/").filter(Boolean).pop(),
+      title: titleElement ? titleElement.innerText.trim() : "",
+      address,
+      city: parsedAddress.city || "",
+      neighborhood: parsedAddress.hood || "",
+      coordinates: null,
+      price: stats.price,
+      sqm: stats.sqm,
+      pricePerSqm: stats.ppsm,
+      url: location.href,
+      recordType: "project",
+    };
+  }
+
   function decodeJsonString(value) {
     try {
       return JSON.parse(`"${value}"`);
@@ -176,6 +199,7 @@ var LRMadlan = (() => {
     listingId,
     listingUrl,
     readAddress,
+    projectExportData,
     extractPriceSqm,
     readAmenities,
     isProjectPage,

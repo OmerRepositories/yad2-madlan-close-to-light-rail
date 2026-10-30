@@ -130,6 +130,55 @@ var LRYad2 = (() => {
     };
   }
 
+  function projectExportData(root, text) {
+    const data = getPageData();
+    const pageProps = data && data.props && data.props.pageProps;
+    const project = pageProps && pageProps.project;
+    const address = project && project.address;
+    const detail = project && project.additionalDetails;
+    const grayProject = pageProps && pageProps.grayProject;
+    const projectId = location.pathname.match(/^\/yad1\/project\/(\d+)\/?$/);
+    if (!projectId || !project || String(project.token) !== projectId[1]) return null;
+
+    const titleElement = root.querySelector('[data-testid="project-title"], h1');
+    const displayAddress =
+      (address && address.display) ||
+      [grayProject && grayProject.street && grayProject.street.name,
+       grayProject && grayProject.houseNumber,
+       grayProject && grayProject.city && grayProject.city.name]
+        .filter(Boolean)
+        .join(" ");
+    const city = address && address.city && address.city.text;
+    const neighborhood = address && address.neighborhood && address.neighborhood.text;
+    const price = Number(detail && detail.minPrice) || null;
+    const sqm = Number(detail && detail.minSquaremeter) || null;
+    const coords = address && address.coords;
+    return {
+      id: projectId[1],
+      title: (titleElement && titleElement.innerText) || project.projectName || "",
+      address: displayAddress,
+      city: city || (grayProject && grayProject.city && grayProject.city.name) || "",
+      neighborhood:
+        neighborhood ||
+        (grayProject && grayProject.neighborhood && grayProject.neighborhood.name) ||
+        "",
+      coordinates:
+        coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon)
+          ? { lat: coords.lat, lon: coords.lon }
+          : grayProject && Number.isFinite(grayProject.y) && Number.isFinite(grayProject.x)
+            ? { lat: grayProject.y, lon: grayProject.x }
+            : null,
+      price,
+      maxPrice: Number(detail && detail.maxPrice) || null,
+      sqm,
+      maxSqm: Number(detail && detail.maxSquaremeter) || null,
+      pricePerSqm: price && sqm ? Math.round(price / sqm) : null,
+      rooms: Number(detail && detail.roomsCount) || null,
+      url: location.href,
+      recordType: "project",
+    };
+  }
+
   function readAddress(root, text, ctxCity, single) {
     const projectPage = isProjectPage(location.pathname);
     const project = projectPage ? projectFromData() : null;
@@ -183,11 +232,16 @@ var LRYad2 = (() => {
       const canEnrichAddress =
         !parsed.street ||
         (!houseNumber(parsed.street) &&
-          candidateStreetName.includes(streetName(parsed.street))) ||
+          (candidateStreetName.includes(streetName(parsed.street)) ||
+            streetName(parsed.street).includes(candidateStreetName))) ||
         addsLocationContext;
       if (
         houseNumber(cardAddress.street) &&
-        focusedAddress.includes(candidateStreetName) &&
+        (focusedAddress.includes(candidateStreetName) ||
+          (!houseNumber(parsed.street) &&
+            (!parsed.street ||
+              candidateStreetName.includes(streetName(parsed.street)) ||
+              streetName(parsed.street).includes(candidateStreetName)))) &&
         !hasConflictingHouseNumbers &&
         canEnrichAddress
       ) {
@@ -251,6 +305,7 @@ var LRYad2 = (() => {
     listingId,
     listingUrl,
     readAddress,
+    projectExportData,
     readAmenities,
     isProjectPage,
     isProjectListingPage,
