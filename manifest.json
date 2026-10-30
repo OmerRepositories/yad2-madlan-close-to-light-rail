@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "קרבה לרכבת הקלה – יד2 ומדלן",
   "description": "מציג על מודעות נדל\"ן ביד2, מדלן ופייסבוק את המרחק לרכבת הקלה ואת המחיר למ\"ר.",
-  "version": "1.11.6",
+  "version": "1.11.7",
   "permissions": ["storage"],
   "action": {
     "default_title": "הגדרות – קרבה לרכבת הקלה",
@@ -32,7 +32,7 @@
         "https://web.facebook.com/*",
         "https://m.facebook.com/*"
       ],
-      "js": ["parse.js", "location.js", "fb.js"],
+      "js": ["parse.js", "facebook-classifier.js", "location.js", "fb.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
     }

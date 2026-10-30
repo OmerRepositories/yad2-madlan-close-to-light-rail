@@ -1,4 +1,4 @@
-// פונקציות חילוץ טהורות (כתובת, מחיר, שטח, עיר). נטענות לפני content.js ואפשר לבדוק אותן ב-Node.
+// Shared extraction helpers (address, price, area, city); Facebook classification lives in facebook-classifier.js.
 var LR = (() => {
   const HEB = /[֐-׿]/;
   const W = "[\\u0590-\\u05FF\"'\\-]+"; // מילה בעברית (כולל גרשיים ומקף)
@@ -311,7 +311,10 @@ var LR = (() => {
 
   function extractPriceSqmFree(text) {
     let t = normQuotes(text);
-    const isRent = /להשכרה|השכרה|שכ"ד|שכירות|לחודש|\/\s*חודש|בחודש|סאבלט/.test(t) && !/למכירה/.test(t);
+    const isRent =
+      /להשכרה|לשכירות|השכרה|שכר\s*דירה|שכ"ד|דמי\s*שכירות|לחודש|\/\s*חודש|בחודש|סאבלט/.test(
+        t
+      ) && !/למכירה|מכירה\s+(?:ישירה|מפרטי|פרטית)/.test(t);
     const cands = [];
     const push = (val, idx, len) => {
       const ctx = t.slice(Math.max(0, idx - 14), idx + len + 8);
@@ -377,7 +380,7 @@ var LR = (() => {
     const labelRe = /(?:בגודל|גודל|בשטח|שטחה|שטח|ברוטו|נטו)\s*(?:בנוי)?\s*[:\-–]?\s*(?:של\s+|כ-?\s*)?(\d{2,4}(?:[.,]\d{1,2})?)(?![\d]|\s*(?:חדר|חד'|קומה|₪|מיליון|אלף))/g;
     for (const x of t.matchAll(labelRe)) addSq(parseFloat(x[1].replace(",", ".")), x.index, 1);
 
-    const unitRe = /(?<![\d.,])(\d{2,4}(?:[.,]\d{1,2})?)\s*(מ"ר|מ'ר|מר|מטר(?:ים)?(?:\s+(?:מרובעים|בנויים|בנוי|נטו|ברוטו))?|מ²|מ2|m²|m2|sqm|sq\.?\s?m)(?![֐-׿\w])/gi;
+    const unitRe = /(?<![\d.,])(\d{2,4}(?:[.,]\d{1,2})?)\s*(מ"ר|מ'ר|מ['׳]|מר|מטר(?:ים)?(?:\s+(?:מרובעים|בנויים|בנוי|נטו|ברוטו))?|מ²|מ2|m²|m2|sqm|sq\.?\s?m)(?![֐-׿\w])/gi;
     for (const x of t.matchAll(unitRe)) {
       const unit = x[2];
       if (/^מטר/.test(unit) && !/מרובע|בנוי|נטו|ברוטו/.test(unit)) {
@@ -400,56 +403,6 @@ var LR = (() => {
 
     const ppsm = !reason ? Math.round(price / sqm) : null;
     return { price, sqm, ppsm, reason, rent: isRent };
-  }
-
-  function classifyFacebookPost(text) {
-    const source = normQuotes(text);
-    const seeking =
-      /מחפש(?:ת|ים|ות)?\s+(?:(?:.{1,35}?)\s+)?(?:דירה|דירות|נכס|נכסים|בית|בתים|יחיד(?:ה|ת)(?:\s+דיור)?|קרקע|מגרש|חדרים?|לשכור|לקנות|לרכוש|שותף|שותפים)/.test(
-        source
-      );
-
-    const explicitlyForSale =
-      /למכירה|למכור|מוכר(?:ת)?\s+(?:דירה|נכס|בית)|מכירה\s+(?:ישירה|מפרטי|פרטית)/.test(
-        source
-      );
-    const clearSellerLanguage =
-      /מפרטי|ללא\s+תיווך|מכירה\s+ישירה|לפרטים\s*(?:נוספים)?|תיאום\s+(?:ביקור|סיור)|חייגו|התקשרו|שלחו\s+הודעה/.test(
-        source
-      );
-    if (explicitlyForSale && (!seeking || clearSellerLanguage)) {
-      const property =
-        /דירה|דירת|חדרים|חד'|פנטהאוז|דופלקס|מ"ר|מ'ר|\bמר\b|למכירה|נכס|קוטג|בית\b/.test(
-          source
-        );
-      const parsed = extractPriceSqmFree(source);
-      if (property && (parsed.price || parsed.sqm)) {
-        return { type: "listing", parsed };
-      }
-    }
-
-    if (seeking) return { type: "seeking" };
-
-    const explicitlyForRent =
-      /להשכרה|השכרה|שכר\s*דירה|שכ"ד|שכירות|לחודש|\/\s*חודש|בחודש|דמי\s*שכירות|סאבלט/.test(
-        source
-      );
-    const lowPrice = [...source.matchAll(/(?:₪\s*([\d,]{3,})|([\d,]{3,})\s*₪)/g)]
-      .map((match) => Number((match[1] || match[2]).replace(/,/g, "")))
-      .some((price) => price >= 800 && price <= 40000);
-    if (explicitlyForRent || (lowPrice && !explicitlyForSale)) {
-      return { type: "rent" };
-    }
-
-    const property =
-      /דירה|דירת|חדרים|חד'|פנטהאוז|דופלקס|מ"ר|מ'ר|\bמר\b|למכירה|נכס|קוטג|בית\b/.test(
-        source
-      );
-    const parsed = extractPriceSqmFree(source);
-    if (property && (parsed.price || parsed.sqm)) {
-      return { type: "listing", parsed };
-    }
-    return { type: "other" };
   }
 
   function hasExplicitFacebookAddress(text, street) {
@@ -507,7 +460,6 @@ var LR = (() => {
     extractPriceSqm: (t) => sanity(extractPriceSqm(t)),
     parseFreeAddress,
     extractPriceSqmFree: (t) => sanity(extractPriceSqmFree(t)),
-    classifyFacebookPost,
     hasExplicitFacebookAddress,
     findCity,
   };

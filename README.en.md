@@ -49,7 +49,7 @@ In Facebook groups and feeds, the extension tries to identify properties offered
 - **Address**: a street and house number, optionally with a city, for example `הרצל 12 פתח תקווה`
 - Rental posts are excluded from purchase analysis. Phrases such as “for rent,” “monthly rent,” or “per month,” as well as a low currency amount typical of rent (for example `₪7,700`), produce a notice that the rental is not relevant to a purchase search.
 - “Looking for an apartment/property” posts are excluded and receive a separate notice.
-- Marketing copy such as “Looking for your next home?” does not override a clear sale listing marked “for sale” or “direct private sale.”
+- Marketing copy such as “Looking for your next home?” is not automatically treated as a home-seeker post when property details and seller signals (such as a sale price or viewing invitation) identify a listing.
 - Phone numbers are not treated as prices.
 - Facebook distance is calculated only when a street and house number are explicitly identified (for example, `רחוב צה״ל 30`). A city alone or a street without a number is not used to guess an address, to avoid misleading locations.
 - If price, area, or address is missing, the badge indicates what could not be found.
@@ -73,7 +73,7 @@ In Facebook groups and feeds, the extension tries to identify properties offered
 
 ## Notes
 
-- Yad2 and Madlan may change their page structures. Site-specific address parsing is in `yad2.js` and `madlan.js`; general parsing is in `parse.js`; coordinate and Maps helpers are in `location.js`.
+- Yad2 and Madlan may change their page structures. Site-specific parsers are in `yad2.js` and `madlan.js`; shared extraction helpers are in `parse.js`; Facebook post classification is isolated in `facebook-classifier.js`; Facebook UI/DOM handling is in `fb.js`; coordinate and Maps helpers are in `location.js`.
 - The median is most meaningful when the results are for a single city or neighborhood.
 - New or under-construction stations may not yet appear in OpenStreetMap.
 
