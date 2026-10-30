@@ -54,6 +54,17 @@
 }
 .lr-amenity-alert[hidden] { display: none; }
 
+/* תיווך במודעה שהמשתמש סימן כפחות מועדף */
+.lr-brokerage-highlight {
+  border-radius: 3px;
+  padding: 0 2px;
+  background: #ffcf33 !important;
+  color: #7a1b00 !important;
+  outline: 2px solid #ff7a00;
+  font-weight: 800 !important;
+  box-shadow: 0 0 8px 2px rgba(255, 122, 0, 0.65);
+}
+
 /* תג "שווה בדיקה" */
 .lr-dealtag {
   background: #f5a300;

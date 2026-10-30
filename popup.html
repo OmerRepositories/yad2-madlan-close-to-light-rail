@@ -15,6 +15,11 @@
     <span>להדגיש מודעות שוות</span>
   </label>
 
+  <label class="row switch">
+    <input type="checkbox" id="avoidBrokerage">
+    <span>פחות עדיף תיווך — להבליט את המילה במודעה</span>
+  </label>
+
   <fieldset>
     <legend>מחיר למ״ר</legend>
 
@@ -36,11 +41,12 @@
 
     <label class="row switch">
       <input type="checkbox" id="requireRail">
-      <span>לדרוש קרבה לרכבת</span>
+      <span>מודעה שווה רק אם היא קרובה לרכבת הקלה</span>
     </label>
+    <p class="small">כשהאפשרות מסומנת, מודעה רחוקה מהמרחק שיוגדר לא תקבל ⭐ „שווה בדיקה”.</p>
 
     <label class="field">
-      <span>מרחק מקסימלי מהתחנה (מטרים)</span>
+      <span>מרחק מקסימלי מתחנת רכבת קלה (מטרים)</span>
       <input type="number" id="nearM" min="100" step="50" placeholder="800">
     </label>
   </fieldset>

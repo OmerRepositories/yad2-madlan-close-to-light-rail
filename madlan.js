@@ -31,6 +31,24 @@ var LRMadlan = (() => {
     const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const scripts = [...document.scripts].map((script) => script.textContent || "");
     for (const source of scripts) {
+      const directMarker = new RegExp(
+        `["']id["']\\s*:\\s*["']${escapedId}["']\\s*,\\s*["']locationPoint["']\\s*:\\s*\\{\\s*["']lat["']\\s*:\\s*(-?\\d+(?:\\.\\d+)?)\\s*,\\s*["']lng["']\\s*:\\s*(-?\\d+(?:\\.\\d+)?)`
+      );
+      const directPoint = directMarker.exec(source);
+      if (directPoint) {
+        const addressStart = source.indexOf('"addressDetails"', directPoint.index);
+        const addressTail =
+          addressStart >= 0 ? source.slice(addressStart, addressStart + 5000) : "";
+        const address = addressTail.match(
+          /["']addressDetails["']\s*:\s*\{[\s\S]{0,3000}?["']city["']\s*:\s*"((?:\\.|[^"\\])*)"[\s\S]{0,1000}?["']streetName["']\s*:\s*"((?:\\.|[^"\\])*)"[\s\S]{0,500}?["']streetNumber["']\s*:\s*"((?:\\.|[^"\\])*)"/
+        );
+        return {
+          coordinates: { lat: Number(directPoint[1]), lon: Number(directPoint[2]) },
+          city: address ? decodeJsonString(address[1]) : null,
+          street: address ? decodeJsonString(address[2]) : null,
+          number: address ? decodeJsonString(address[3]) : null,
+        };
+      }
       const marker = new RegExp(`["']id["']\\s*:\\s*["']${escapedId}["']`, "g");
       let match;
       while ((match = marker.exec(source))) {

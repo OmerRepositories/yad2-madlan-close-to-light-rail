@@ -12,6 +12,7 @@
     requireRail: true, // לדרוש קרבה לרכבת
     nearM: 800, // מרחק מקסימלי מהרכבת במטרים
     highlight: true, // להדגיש מודעות שוות (מסגרת + תג)
+    avoidBrokerage: false,
     requiredAmenities: ["secureRoom"],
   };
   const CFG = {
@@ -120,6 +121,46 @@
       if (len > limit) break;
     }
     return out.join("\n");
+  }
+
+  function highlightBrokerage(root, enabled) {
+    if (!root) return;
+    const existing = root.querySelectorAll(".lr-brokerage-highlight");
+    if (!enabled) {
+      existing.forEach((mark) => mark.replaceWith(document.createTextNode(mark.textContent)));
+      return;
+    }
+
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const parent = node.parentElement;
+        if (
+          !parent ||
+          parent.closest(".lr-wrap, .lr-brokerage-highlight, script, style, noscript, textarea")
+        ) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return /תיווך/.test(node.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+
+    for (const node of nodes) {
+      const fragment = document.createDocumentFragment();
+      const parts = node.nodeValue.split(/(תיווך)/g);
+      for (const part of parts) {
+        if (part === "תיווך") {
+          const mark = document.createElement("span");
+          mark.className = "lr-brokerage-highlight";
+          mark.textContent = part;
+          fragment.appendChild(mark);
+        } else if (part) {
+          fragment.appendChild(document.createTextNode(part));
+        }
+      }
+      node.replaceWith(fragment);
+    }
   }
 
   // ---------- טקסט של מודעה בודדת ----------
@@ -377,6 +418,11 @@
       }
       const root = entry.kind === "single" ? document : entry.card;
       entry.amenities = (IS_YAD2 ? LRYad2 : LRMadlan).readAmenities(root);
+      const listingRoot =
+        entry.kind === "single"
+          ? document.querySelector("main") || document.body
+          : entry.card;
+      highlightBrokerage(listingRoot, CFG.avoidBrokerage);
       if (entry.kind === "single") {
         const missing = CFG.requiredAmenities
           .filter((amenity) => entry.amenities && entry.amenities[amenity] === false)

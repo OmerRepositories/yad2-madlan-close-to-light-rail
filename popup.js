@@ -5,6 +5,7 @@ const DEFAULTS = {
   requireRail: true,
   nearM: 800,
   highlight: true,
+  avoidBrokerage: false,
   requiredAmenities: ["secureRoom"],
 };
 
@@ -24,7 +25,7 @@ const AMENITIES = [
 
 const $ = (id) => document.getElementById(id);
 const numberKeys = ["maxPpsm", "belowMedianPct", "nearM"];
-const boolKeys = ["requireRail", "highlight"];
+const boolKeys = ["requireRail", "highlight", "avoidBrokerage"];
 
 function fill(s) {
   for (const k of numberKeys) $(k).value = s[k] ? s[k] : k === "nearM" ? s[k] : "";
