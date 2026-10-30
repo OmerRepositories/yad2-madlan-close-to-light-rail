@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "ייצוא פוסטים מקבוצת פייסבוק",
+  "description": "מייצא לקובץ TXT את טקסט הפוסטים שגללת אליהם בפייסבוק.",
+  "version": "1.0.0",
+  "permissions": ["activeTab"],
+  "action": {
+    "default_title": "Export Facebook posts",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.facebook.com/*",
+        "https://web.facebook.com/*",
+        "https://m.facebook.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

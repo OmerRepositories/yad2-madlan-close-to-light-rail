@@ -19,6 +19,10 @@ Colors: green up to 600 m · yellow up to 1.5 km · gray for farther distances. 
 3. Click **Load unpacked** and select the `lightrail-ext` directory.
 4. If the extension is already installed, click its reload button and refresh the website.
 
+## Separate tool: Facebook post export
+
+The [`facebook-post-exporter`](./facebook-post-exporter/) directory contains a separate Chrome extension that collects Facebook group/feed post text into one TXT file as posts enter the visible page while you scroll. See the [exporter's README](./facebook-post-exporter/README.md) for installation and use. It is separate from the light-rail extension and is excluded from the main extension's Release package.
+
 ## License and terms
 
 Use of the extension is subject to the [license and terms of use](./LICENSE.en.md). The Hebrew version is available in [LICENSE.md](./LICENSE.md).

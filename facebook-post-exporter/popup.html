@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ייצוא פוסטים</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <h1>ייצוא פוסטים מפייסבוק</h1>
+    <p class="description">
+      אוסף את טקסט הפוסטים בזמן הגלילה. ייכללו רק פוסטים שהגיעו למסך.
+    </p>
+    <p id="status" role="status" aria-live="polite">בודק את הלשונית…</p>
+    <button id="export" type="button" disabled>ייצוא הפוסטים שנאספו לקובץ TXT</button>
+    <p class="note">
+      הטקסט נשמר בזיכרון של הלשונית עד לייצוא. תגובות לא נאספות.
+    </p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

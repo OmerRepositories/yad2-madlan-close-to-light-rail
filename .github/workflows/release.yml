@@ -55,7 +55,7 @@ jobs:
           fi
 
           archive="lightrail-ext-$VERSION.zip"
-          git archive --format=zip --prefix=lightrail-ext/ HEAD > "$archive"
+          git archive --format=zip --prefix=lightrail-ext/ HEAD -- . ':(exclude)facebook-post-exporter/**' > "$archive"
           gh release create "$tag" "$archive" \
             --title "Lightrail Extension $tag" \
             --generate-notes
