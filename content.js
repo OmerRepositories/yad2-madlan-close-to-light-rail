@@ -9,6 +9,10 @@
     IS_YAD2
       ? LRYad2.isProjectPage(location.pathname)
       : LRMadlan.isProjectPage(location.pathname);
+  const isProjectListingPage = () =>
+    IS_YAD2
+      ? LRYad2.isProjectListingPage(location.pathname)
+      : LRMadlan.isProjectListingPage(location.pathname);
 
   // ===== הגדרות =====
   // ברירות המחדל זהות ל-popup.js. המשתמש משנה אותן דרך חלון ההגדרות של התוסף.
@@ -245,11 +249,13 @@
       card.classList.contains("lr-project-removed")
     ).length;
     const projectStatus = brokerageFilterBar.querySelector(".lr-project-filter-status");
-    projectStatus.textContent = projectCount
-      ? `הוסרו ${projectCount} פרויקטים בעמוד`
-      : removeProjectsForPage || CFG.removeProjects
-        ? "לא נמצאו פרויקטים"
-        : "";
+    projectStatus.textContent = isProjectListingPage()
+      ? "סינון פרויקטים לא פעיל בעמוד פרויקטים"
+      : projectCount
+        ? `הוסרו ${projectCount} פרויקטים בעמוד`
+        : removeProjectsForPage || CFG.removeProjects
+          ? "לא נמצאו פרויקטים"
+          : "";
   }
 
   function isProjectPath(path) {
@@ -297,7 +303,11 @@
       if (!card.isConnected) projectCards.delete(card);
     }
     for (const card of findProjectCards()) projectCards.add(card);
-    const shouldRemove = CFG.removeProjects || removeProjectsForPage;
+    const projectListingPage = isProjectListingPage();
+    const projectButton = brokerageFilterBar?.querySelector(".lr-project-filter-button");
+    if (projectButton) projectButton.hidden = projectListingPage;
+    const shouldRemove =
+      !projectListingPage && (CFG.removeProjects || removeProjectsForPage);
     for (const card of projectCards) {
       card.classList.toggle("lr-project-removed", shouldRemove);
     }
@@ -325,6 +335,7 @@
     brokerageStatus.className = "lr-brokerage-filter-status";
     brokerageStatus.setAttribute("aria-live", "polite");
     const projectButton = document.createElement("button");
+    projectButton.className = "lr-project-filter-button";
     projectButton.type = "button";
     projectButton.textContent = "הסר פרויקטים בעמוד זה";
     projectButton.addEventListener("click", () => {

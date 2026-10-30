@@ -81,6 +81,9 @@ test("Yad2 first-hand project detail pages are recognized", () => {
   assert.equal(context.LRYad2.isProjectPage("/yad1/project/18636/"), true);
   assert.equal(context.LRYad2.isProjectPage("/realestate/item/center-and-sharon/v3y00p91"), false);
   assert.equal(context.LRYad2.isProjectPage("/yad1/project/"), false);
+  assert.equal(context.LRYad2.isProjectListingPage("/yad1"), true);
+  assert.equal(context.LRYad2.isProjectListingPage("/yad1/"), true);
+  assert.equal(context.LRYad2.isProjectListingPage("/yad1/project/18636"), false);
   assert.equal(
     context.LRYad2.listingUrl(context.document),
     "https://www.yad2.co.il/realestate/item/center-and-sharon/v3y00p91?source=test"
@@ -178,6 +181,18 @@ test("Madlan project detail pages are recognized", () => {
   assert.equal(madlanContext.LRMadlan.isProjectPage("/projects/example_project/"), true);
   assert.equal(madlanContext.LRMadlan.isProjectPage("/listings/listing-id"), false);
   assert.equal(madlanContext.LRMadlan.isProjectPage("/projects/"), false);
+  assert.equal(
+    madlanContext.LRMadlan.isProjectListingPage("/projects-for-sale/ישראל"),
+    true
+  );
+  assert.equal(
+    madlanContext.LRMadlan.isProjectListingPage("/projects-for-rent/ישראל"),
+    true
+  );
+  assert.equal(
+    madlanContext.LRMadlan.isProjectListingPage("/projects/example_project"),
+    false
+  );
   assert.equal(
     madlanContext.LRMadlan.listingUrl(madlanContext.document),
     "https://www.madlan.co.il/listings/ad-456"

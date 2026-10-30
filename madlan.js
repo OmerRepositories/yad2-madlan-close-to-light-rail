@@ -41,6 +41,10 @@ var LRMadlan = (() => {
     );
   }
 
+  function isProjectListingPage(path) {
+    return /^\/projects-for-(?:sale|rent)(?:\/|$)/i.test(path);
+  }
+
   function decodeJsonString(value) {
     try {
       return JSON.parse(`"${value}"`);
@@ -168,5 +172,13 @@ var LRMadlan = (() => {
     return result;
   }
 
-  return { listingId, listingUrl, readAddress, extractPriceSqm, readAmenities, isProjectPage };
+  return {
+    listingId,
+    listingUrl,
+    readAddress,
+    extractPriceSqm,
+    readAmenities,
+    isProjectPage,
+    isProjectListingPage,
+  };
 })();
