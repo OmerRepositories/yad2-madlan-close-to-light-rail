@@ -33,7 +33,6 @@
   const LISTING_CACHE_KEY = "yad2AmenityCache_v1";
   const LISTING_CACHE_TTL_MS = 60 * 24 * 60 * 60 * 1000;
   const LISTING_CACHE_MAX_ITEMS = 2500;
-  const IS_YAD2 = location.hostname.includes("yad2.co.il");
   const SITE_DISABLE_KEY = IS_YAD2 ? "disableYad2" : "disableMadlan";
   let listingCache = {};
   let listingCacheLoaded = false;
@@ -518,7 +517,10 @@
 
     if (!res.approx) {
       b._open = () => {
-        const url = LRLocation.mapsDirectionsUrl(res.origin, res.station);
+        const origin =
+          entry.mapsOrigin ||
+          `${res.origin.lat},${res.origin.lon}`;
+        const url = LRLocation.mapsDirectionsUrl(origin, res.station.name);
         window.open(url, "_blank", "noopener");
       };
     }
@@ -545,6 +547,7 @@
       const parsed = siteParser.readAddress(root, text, ctxCity(), entry.kind === "single");
       entry.listingId = siteParser.listingId(root);
       const { queries } = parsed;
+      entry.mapsOrigin = queries.find((query) => !query.cityOnly)?.q || null;
       if (!queries.length && !LRLocation.validCoordinates(parsed.coordinates)) {
         // ייתכן שהכרטיס עוד לא נטען במלואו – מנסים שוב כמה פעמים
         if (++entry.tries < maxTries) return setTimeout(attempt, 1000);

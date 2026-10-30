@@ -10,15 +10,32 @@ var LRLocation = (() => {
     );
   }
 
+  function stationMapsQuery(name) {
+    const station = String(name || "").trim();
+    return /תחנ|רכבת קלה|light rail|tram/i.test(station)
+      ? station
+      : `תחנת הרכבת הקלה ${station}`;
+  }
+
   function mapsDirectionsUrl(origin, destination) {
     const params = new URLSearchParams({
       api: "1",
       travelmode: "walking",
-      origin: `${origin.lat},${origin.lon}`,
-      destination: `${destination.lat},${destination.lon}`,
+      origin:
+        typeof origin === "string"
+          ? origin
+          : `${origin.lat},${origin.lon}`,
+      destination:
+        typeof destination === "string"
+          ? stationMapsQuery(destination)
+          : destination.name
+            ? stationMapsQuery(destination.name)
+            : `${destination.lat},${destination.lon}`,
     });
     return `https://www.google.com/maps/dir/?${params}`;
   }
 
-  return { validCoordinates, mapsDirectionsUrl };
+  return { validCoordinates, mapsDirectionsUrl, stationMapsQuery };
 })();
+
+if (typeof module !== "undefined") module.exports = LRLocation;

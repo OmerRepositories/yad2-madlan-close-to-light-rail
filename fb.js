@@ -188,7 +188,10 @@
     const walk = m > 4000 ? "" : `🚶 ~${res.walkMin} דק׳ הליכה · `;
     if (!res.approx) {
       b._open = () => {
-        const url = LRLocation.mapsDirectionsUrl(res.origin, res.station);
+        const origin =
+          entry.mapsOrigin ||
+          `${res.origin.lat},${res.origin.lon}`;
+        const url = LRLocation.mapsDirectionsUrl(origin, res.station.name);
         window.open(url, "_blank", "noopener");
       };
     }
@@ -207,6 +210,7 @@
     const text = postText(entry.article);
     const parsed = LR.parseFreeAddress(text, groupContext());
     const { queries } = parsed;
+    entry.mapsOrigin = queries[0] && queries[0].q;
     if (!queries.length || !LR.hasExplicitFacebookAddress(text, parsed.street)) {
       renderRail(entry, {
         ok: false,
