@@ -1,0 +1,76 @@
+# Light Rail Proximity — Chrome extension for Yad2, Madlan, and Facebook
+
+[עברית](./README.md)
+
+The extension displays useful indicators on real-estate listings in search results and on listing pages:
+
+- **Light rail distance**: `450 m` · `🚶 ~7 min walk · 🚉 Dizengoff`
+- **Price per square meter**: `₪28,800` · `−12% from the page median`
+- `⭐ Worth checking` — highlights listings that meet all enabled criteria.
+
+Clicking an exact-distance badge opens a new Google Maps tab with walking directions from the address to the station. Approximate locations do not open Maps, to avoid showing a misleading point.
+
+Colors: green up to 600 m · yellow up to 1.5 km · gray for farther distances. `≈` means the location is approximate.
+
+## Installation (Developer mode)
+
+1. Open `chrome://extensions`.
+2. Enable **Developer mode**.
+3. Click **Load unpacked** and select the `lightrail-ext` directory.
+4. If the extension is already installed, click its reload button and refresh the website.
+
+## License and terms
+
+Use of the extension is subject to the [license and terms of use](./LICENSE.en.md). The Hebrew version is available in [LICENSE.md](./LICENSE.md).
+
+## Settings
+
+Click the extension icon in Chrome's toolbar. Settings are saved automatically and applied to open pages:
+
+- **Maximum price per square meter (₪)** — for example, `30000`. `0` or blank disables the limit.
+- **At least this percentage below the page median** — `0` disables this rule.
+- **Require proximity to light rail** and set the **maximum distance** from a station.
+- **Highlight good listings** — displays a badge and orange outline when all enabled requirements are met.
+- **Brokerage is less preferred** — highlights mentions of brokerage and real-estate terms; Yad2's agent label above the price is highlighted too. Positive phrases such as “without brokerage” are shown as positive.
+- **Always remove brokerage listings** — automatically hides listings detected as brokerage. Alternatively, use the button at the top of a search page to hide them only for the current page; this temporary filter is not retained after a refresh.
+- **Always remove projects** — hides project cards, including Yad2 `/yad1/project/` links and Madlan `/projects/` links. The button at the top of a search page can apply this only to the current page.
+- **Required listing amenities** — choose parking, secure room (Mamad), elevator, storage, air conditioning, accessibility, balcony, solar water heater, bars, garden, and pool. Missing amenities are shown as an alert on a listing page and prevent the listing from being marked as worth checking. Unknown amenities are reported as unverifiable. Mamad is selected by default.
+- **Listing-check cache for Yad2 and Madlan** — after opening a listing, its ID and amenity status are stored locally for up to 60 days. Site-specific ID prefixes are used, and temporary URL parameters are ignored. When the listing appears in search results again, the cache shows missing required amenities or confirms that they were found. Up to 2,500 listings are retained; old records are removed automatically. **Clear saved data** removes only the listing cache, not user settings.
+
+All enabled criteria must be met for a listing to be highlighted as worth checking.
+
+## Facebook
+
+In Facebook groups and feeds, posts that look like real-estate listings (real-estate terms plus a price or area) can receive the same indicators. The parser supports free-form text, including common Hebrew formats such as:
+
+- **Price**: `2,500,000` · `2.5 מיליון` · `2.5M` · `950 אלף` · `מיליון וחצי`
+- **Area**: `95 מ"ר` · `גודל 80` · `80 מטר מרובעים`
+- **Address**: a street and house number, optionally with a city, for example `הרצל 12 פתח תקווה`
+- Phone numbers are not treated as prices, and rental posts do not receive a price-per-square-meter calculation.
+- On Facebook, distance is shown only when the post includes a street address; a city alone is not specific enough.
+- If price, area, or address is missing, the badge indicates what could not be found.
+
+## How it works
+
+- **Addresses**: Yad2 and Madlan are parsed using known site structures and listing data first. If those are unavailable, the extension falls back to general text parsing. The search context can supply a missing city.
+- **Price per square meter**: price divided by area, compared with the median of listings on the page. A listing page uses the last saved search median when available.
+- **Stations**: sourced from OpenStreetMap (Overpass) and cached for one week.
+- **Lazy processing**: listing calculations start as cards approach the viewport.
+- **Storage**: preferences are stored separately in `chrome.storage.sync`; listing checks are stored locally in `chrome.storage.local` and are not synced.
+- **Geocoding**: exact coordinates provided by a listing are preferred. Otherwise, Nominatim (OSM) is queried. When a house number is requested, a result with a different number is rejected; a street-level fallback is marked approximate. Requests are rate-limited to comply with the service policy.
+- **Distance**: straight-line distance to the nearest station; estimated walking time is distance × 1.3 ÷ 80 m/min.
+
+## Troubleshooting
+
+- **Address not found** — hover over the distance badge to see which addresses were searched.
+- **Price per square meter unavailable** — the badge indicates whether price or area could not be extracted.
+
+## Notes
+
+- Yad2 and Madlan may change their page structures. Site-specific address parsing is in `yad2.js` and `madlan.js`; general parsing is in `parse.js`; coordinate and Maps helpers are in `location.js`.
+- The median is most meaningful when the results are for a single city or neighborhood.
+- New or under-construction stations may not yet appear in OpenStreetMap.
+
+## Releases
+
+Releases are created automatically when a commit is pushed to `main` with a `manifest.json` version higher than the latest release. The version must use `MAJOR.MINOR.PATCH` format. Each release includes a ZIP archive of the extension.

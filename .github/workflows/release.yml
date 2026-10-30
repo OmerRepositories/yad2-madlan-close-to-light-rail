@@ -1,0 +1,61 @@
+name: Create extension release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: extension-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository and tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read and validate extension version
+        id: version
+        shell: bash
+        run: |
+          version="$(jq -r '.version' manifest.json)"
+          if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::manifest.json version must use MAJOR.MINOR.PATCH format"
+            exit 1
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Create release if the version advanced
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.value }}
+        shell: bash
+        run: |
+          latest_tag="$(git tag --list 'v[0-9]*' | sort -V | tail -n 1)"
+          if [[ -n "$latest_tag" ]]; then
+            latest_version="${latest_tag#v}"
+            newest_version="$(printf '%s\n%s\n' "$latest_version" "$VERSION" | sort -V | tail -n 1)"
+            if [[ "$VERSION" == "$latest_version" || "$newest_version" != "$VERSION" ]]; then
+              echo "No newer manifest version to release (current: $VERSION, latest tag: $latest_tag)."
+              exit 0
+            fi
+          fi
+
+          tag="v$VERSION"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists; skipping duplicate release."
+            exit 0
+          fi
+
+          archive="lightrail-ext-$VERSION.zip"
+          git archive --format=zip --prefix=lightrail-ext/ HEAD > "$archive"
+          gh release create "$tag" "$archive" \
+            --title "Lightrail Extension $tag" \
+            --generate-notes
