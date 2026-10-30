@@ -6,6 +6,7 @@ const DEFAULTS = {
   nearM: 800,
   highlight: true,
   avoidBrokerage: false,
+  removeBrokerage: false,
   requiredAmenities: ["secureRoom"],
 };
 
@@ -24,8 +25,10 @@ const AMENITIES = [
 ];
 
 const $ = (id) => document.getElementById(id);
+const LISTING_CACHE_KEY = "yad2AmenityCache_v1";
+const LISTING_CACHE_TTL_MS = 60 * 24 * 60 * 60 * 1000;
 const numberKeys = ["maxPpsm", "belowMedianPct", "nearM"];
-const boolKeys = ["requireRail", "highlight", "avoidBrokerage"];
+const boolKeys = ["requireRail", "highlight", "avoidBrokerage", "removeBrokerage"];
 
 function fill(s) {
   for (const k of numberKeys) $(k).value = s[k] ? s[k] : k === "nearM" ? s[k] : "";
@@ -102,3 +105,46 @@ $("reset").addEventListener("click", () => {
     () => flash("✓ אופס")
   );
 });
+
+function updateCacheStatus() {
+  chrome.storage.local.get(LISTING_CACHE_KEY, (stored) => {
+    const status = $("cacheStatus");
+    if (chrome.runtime.lastError) {
+      status.textContent = "לא ניתן לקרוא את המטמון";
+      status.dataset.error = "true";
+      return;
+    }
+    const now = Date.now();
+    const records = Object.values(stored[LISTING_CACHE_KEY] || {}).filter(
+      (record) =>
+        record &&
+        Number.isFinite(record.updatedAt) &&
+        now - record.updatedAt < LISTING_CACHE_TTL_MS
+    );
+    status.textContent = `${records.length} מודעות שמורות`;
+    status.dataset.error = "false";
+  });
+}
+
+$("clearListingCache").addEventListener("click", () => {
+  $("clearListingCache").disabled = true;
+  chrome.storage.local.remove(LISTING_CACHE_KEY, () => {
+    $("clearListingCache").disabled = false;
+    const status = $("cacheStatus");
+    if (chrome.runtime.lastError) {
+      status.textContent = "המחיקה נכשלה";
+      status.dataset.error = "true";
+      console.error("[lightrail-ext] failed to clear listing cache", chrome.runtime.lastError.message);
+      return;
+    }
+    status.textContent = "המידע על המודעות נמחק";
+    status.dataset.error = "false";
+    setTimeout(updateCacheStatus, 1800);
+  });
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes[LISTING_CACHE_KEY]) updateCacheStatus();
+});
+
+updateCacheStatus();

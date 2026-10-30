@@ -5,7 +5,14 @@ var LRMadlan = (() => {
       const pageMatch = location.pathname.match(/\/(?:listings|bulletin)\/([^/]+)/);
       if (pageMatch) return pageMatch[1];
     }
-    const links = root.querySelectorAll ? root.querySelectorAll("a[href]") : [];
+    const listingLink = root.querySelector
+      ? root.querySelector('a[data-auto="listed-bulletin-clickable"][href], a[href*="/listings/"]')
+      : null;
+    const links = listingLink
+      ? [listingLink]
+      : root.querySelectorAll
+        ? root.querySelectorAll("a[href]")
+        : [];
     for (const link of links) {
       try {
         const path = new URL(link.href, location.href).pathname;
@@ -141,5 +148,5 @@ var LRMadlan = (() => {
     return result;
   }
 
-  return { readAddress, extractPriceSqm, readAmenities };
+  return { listingId, readAddress, extractPriceSqm, readAmenities };
 })();

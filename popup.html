@@ -19,6 +19,11 @@
     <input type="checkbox" id="avoidBrokerage">
     <span>פחות עדיף תיווך — להבליט את המילה במודעה</span>
   </label>
+  <label class="row switch">
+    <input type="checkbox" id="removeBrokerage">
+    <span>להסיר מודעות תיווך תמיד</span>
+  </label>
+  <p class="small">אפשר גם להסיר תיווך רק לעמוד הנוכחי באמצעות הכפתור שבראש עמוד החיפוש.</p>
 
   <fieldset>
     <legend>מחיר למ״ר</legend>
@@ -55,6 +60,15 @@
     <legend>מאפיינים שחובה במודעה</legend>
     <p class="small">מודעה שחסר בה מאפיין מסומן תציג אזהרה בעמוד המודעה ולא תסומן כשווה.</p>
     <div id="requiredAmenities" class="amenities"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>מטמון בדיקות מודעות</legend>
+    <p class="small">נשמרים מקומית מזהה מודעת יד2/מדלן ומצבי המאפיינים שנבדקו. המטמון לא מסונכרן ולא משפיע על ההעדפות.</p>
+    <div class="cache-actions">
+      <button id="clearListingCache" type="button">מחיקת מידע שמור</button>
+      <span id="cacheStatus" aria-live="polite"></span>
+    </div>
   </fieldset>
 
   <div class="actions">

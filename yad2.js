@@ -2,6 +2,7 @@
 var LRYad2 = (() => {
   let pageData;
   let pageDataRead = false;
+  let pageListingsById;
 
   function getPageData() {
     if (pageDataRead) return pageData;
@@ -33,25 +34,49 @@ var LRYad2 = (() => {
     return match ? match[1] : null;
   }
 
-  function findListing(data, id) {
-    if (!data || !id) return null;
-    if (Array.isArray(data)) {
-      for (const value of data) {
-        const found = findListing(value, id);
-        if (found) return found;
+  function getPageListingsById() {
+    if (pageListingsById) return pageListingsById;
+    const data = getPageData();
+    if (!data) return null;
+    pageListingsById = new Map();
+    const stack = [data];
+    const visited = new WeakSet();
+    while (stack.length) {
+      const current = stack.pop();
+      if (!current || typeof current !== "object" || visited.has(current)) continue;
+      visited.add(current);
+      if (Array.isArray(current)) {
+        for (const value of current) stack.push(value);
+        continue;
       }
-    } else if (typeof data === "object") {
-      if (String(data.token || "") === id && data.address) return data;
-      for (const value of Object.values(data)) {
-        const found = findListing(value, id);
-        if (found) return found;
+      if (current.token && current.address) {
+        pageListingsById.set(String(current.token), current);
       }
+      for (const value of Object.values(current)) stack.push(value);
     }
-    return null;
+    return pageListingsById;
+  }
+
+  function listingId(root) {
+    if (root === document) {
+      const pageMatch = location.pathname.match(/\/realestate\/item\/[^/]+\/([^/]+)/);
+      return pageMatch ? pageMatch[1] : null;
+    }
+    const link = root.querySelector('a[href*="/realestate/item/"]');
+    if (!link) return null;
+    try {
+      const path = new URL(link.href, location.href).pathname;
+      const match = path.match(/\/realestate\/item\/[^/]+\/([^/]+)/);
+      return match ? match[1] : null;
+    } catch {
+      return null;
+    }
   }
 
   function placeFromData(root) {
-    const record = findListing(getPageData(), listingId(root));
+    const id = listingId(root);
+    const index = id ? getPageListingsById() : null;
+    const record = index && index.get(id);
     const address = record && record.address;
     if (!address) return null;
     const street = address.street && address.street.text;
@@ -121,5 +146,5 @@ var LRYad2 = (() => {
     return result;
   }
 
-  return { readAddress, readAmenities };
+  return { listingId, readAddress, readAmenities };
 })();

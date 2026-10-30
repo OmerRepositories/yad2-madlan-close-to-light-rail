@@ -54,6 +54,52 @@
 }
 .lr-amenity-alert[hidden] { display: none; }
 
+/* תוצאה ידועה ממטמון בדיקות המודעות */
+.lr-cache-note {
+  flex-basis: 100%;
+  padding: 5px 8px;
+  border: 1px solid #b7e4c7;
+  border-radius: 7px;
+  background: #e6f7ec;
+  color: #11722f;
+  font: 700 12px/1.35 system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+.lr-cache-note[data-state="missing"] {
+  border-color: #f5c2c2;
+  background: #fdecec;
+  color: #a12727;
+}
+.lr-cache-note[hidden] { display: none; }
+.lr-cache-missing { outline: 2px solid #d64545 !important; }
+
+.lr-brokerage-removed { display: none !important; }
+
+#lr-brokerage-filter {
+  position: sticky;
+  top: 0;
+  z-index: 2147482999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #fff7e6;
+  border-bottom: 1px solid #f0c36d;
+  direction: rtl;
+  font: 600 13px/1.4 system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+#lr-brokerage-filter button {
+  padding: 6px 12px;
+  border: 1px solid #c2410c;
+  border-radius: 7px;
+  background: #ea580c;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+#lr-brokerage-filter button:hover { background: #c2410c; }
+.lr-brokerage-filter-status { color: #7c2d12; }
+
 /* תיווך במודעה שהמשתמש סימן כפחות מועדף */
 .lr-brokerage-highlight {
   border-radius: 3px;
@@ -63,6 +109,15 @@
   outline: 2px solid #ff7a00;
   font-weight: 800 !important;
   box-shadow: 0 0 8px 2px rgba(255, 122, 0, 0.65);
+}
+.lr-brokerage-positive {
+  border-radius: 3px;
+  padding: 0 2px;
+  background: #d9fbe5 !important;
+  color: #116329 !important;
+  outline: 2px solid #22a447;
+  font-weight: 800 !important;
+  box-shadow: 0 0 7px 1px rgba(34, 164, 71, 0.45);
 }
 
 /* תג "שווה בדיקה" */

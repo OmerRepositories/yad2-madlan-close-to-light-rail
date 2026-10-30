@@ -13,6 +13,7 @@
     nearM: 800, // מרחק מקסימלי מהרכבת במטרים
     highlight: true, // להדגיש מודעות שוות (מסגרת + תג)
     avoidBrokerage: false,
+    removeBrokerage: false,
     requiredAmenities: ["secureRoom"],
   };
   const CFG = {
@@ -21,7 +22,13 @@
     ROOT_MARGIN: "700px", // מתחילים לחשב מודעות שנמצאות עד כמה פיקסלים מהמסך
   };
 
+  const LISTING_CACHE_KEY = "yad2AmenityCache_v1";
+  const LISTING_CACHE_TTL_MS = 60 * 24 * 60 * 60 * 1000;
+  const LISTING_CACHE_MAX_ITEMS = 2500;
   const IS_YAD2 = location.hostname.includes("yad2.co.il");
+  let listingCache = {};
+  let cacheSaveTimer = null;
+  const cacheWriteSuppressedIds = new Set();
 
   // קישורים שמזהים מודעה בודדת
   const LISTING_HREF = IS_YAD2
@@ -39,6 +46,8 @@
   let refreshTimer = null;
   let pageBias = null; // המיקום האחרון שנמצא בדיוק, לעזרה בכתובות בלי עיר
   let storedMedian = null; // חציון מחיר למ"ר מחיפוש אחרון (לדפי מודעה בודדת)
+  let removeBrokerageForPage = false;
+  let brokerageFilterBar = null;
 
   const io = new IntersectionObserver(
     (list) => {
@@ -125,7 +134,7 @@
 
   function highlightBrokerage(root, enabled) {
     if (!root) return;
-    const existing = root.querySelectorAll(".lr-brokerage-highlight");
+    const existing = root.querySelectorAll(".lr-brokerage-highlight, .lr-brokerage-positive");
     if (!enabled) {
       existing.forEach((mark) => mark.replaceWith(document.createTextNode(mark.textContent)));
       return;
@@ -136,31 +145,100 @@
         const parent = node.parentElement;
         if (
           !parent ||
-          parent.closest(".lr-wrap, .lr-brokerage-highlight, script, style, noscript, textarea")
+          parent.closest(
+            ".lr-wrap, .lr-brokerage-highlight, .lr-brokerage-positive, script, style, noscript, textarea"
+          )
         ) {
           return NodeFilter.FILTER_REJECT;
         }
-        return /תיווך/.test(node.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        return (
+          /תיווך|נדל(?:[״"'׳]?ן)/.test(node.nodeValue) ||
+          Boolean(parent.closest('[data-testid="ad-card-above-price"]'))
+        )
+          ? NodeFilter.FILTER_ACCEPT
+          : NodeFilter.FILTER_REJECT;
       },
     });
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
 
+    const brokerageTerms =
+      /((?:ללא|בלי|לא)(?:\s+(?:(?:צורך\s+)?(?:ב|דרך|באמצעות)))?\s*תיווך)|תיווך|נדל(?:[״"'׳]?ן)/g;
     for (const node of nodes) {
       const fragment = document.createDocumentFragment();
-      const parts = node.nodeValue.split(/(תיווך)/g);
-      for (const part of parts) {
-        if (part === "תיווך") {
-          const mark = document.createElement("span");
-          mark.className = "lr-brokerage-highlight";
-          mark.textContent = part;
-          fragment.appendChild(mark);
-        } else if (part) {
-          fragment.appendChild(document.createTextNode(part));
-        }
+      const text = node.nodeValue;
+      if (node.parentElement.closest('[data-testid="ad-card-above-price"]')) {
+        const mark = document.createElement("span");
+        mark.className = "lr-brokerage-highlight";
+        mark.textContent = text;
+        node.replaceWith(mark);
+        continue;
       }
+      let cursor = 0;
+      for (const match of text.matchAll(brokerageTerms)) {
+        const index = match.index;
+        if (index > cursor) fragment.appendChild(document.createTextNode(text.slice(cursor, index)));
+        const mark = document.createElement("span");
+        mark.className = match[1] ? "lr-brokerage-positive" : "lr-brokerage-highlight";
+        mark.textContent = match[0];
+        fragment.appendChild(mark);
+        cursor = index + match[0].length;
+      }
+      if (cursor < text.length) fragment.appendChild(document.createTextNode(text.slice(cursor)));
       node.replaceWith(fragment);
     }
+  }
+
+  function hasBrokerageSignal(root) {
+    if (!root) return false;
+    const agentLabel = root.querySelector('[data-testid="ad-card-above-price"]');
+    if (agentLabel && agentLabel.textContent.trim()) return true;
+
+    const text = textOf(root, 6000)
+      .replace(/\s+/g, " ")
+      .replace(/(?:ללא|בלי|לא)(?:\s+(?:(?:צורך\s+)?(?:ב|דרך|באמצעות)))?\s*תיווך/g, "");
+    return /תיווך|נדל(?:[״"'׳]?ן)/.test(text);
+  }
+
+  function filterBrokerageEntry(entry) {
+    if (entry.kind !== "list") return false;
+    const shouldRemove =
+      (CFG.removeBrokerage || removeBrokerageForPage) && hasBrokerageSignal(entry.card);
+    entry.card.classList.toggle("lr-brokerage-removed", shouldRemove);
+    entry.brokerageRemoved = shouldRemove;
+    return shouldRemove;
+  }
+
+  function updateBrokerageFilterStatus() {
+    if (!brokerageFilterBar) return;
+    const count = [...entries.values()].filter((entry) => entry.brokerageRemoved).length;
+    const status = brokerageFilterBar.querySelector(".lr-brokerage-filter-status");
+    status.textContent = count
+      ? `הוסרו ${count} מודעות תיווך בעמוד`
+      : removeBrokerageForPage || CFG.removeBrokerage
+        ? "לא נמצאו מודעות תיווך"
+        : "";
+    brokerageFilterBar.dataset.active = String(removeBrokerageForPage || CFG.removeBrokerage);
+  }
+
+  function createBrokerageFilterBar() {
+    if (brokerageFilterBar || LISTING_HREF.test(location.pathname)) return;
+    brokerageFilterBar = document.createElement("div");
+    brokerageFilterBar.id = "lr-brokerage-filter";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "הסר מודעות תיווך בעמוד זה";
+    button.addEventListener("click", () => {
+      removeBrokerageForPage = true;
+      findCards().forEach(processCard);
+      for (const entry of entries.values()) filterBrokerageEntry(entry);
+      updateBrokerageFilterStatus();
+    });
+    const status = document.createElement("span");
+    status.className = "lr-brokerage-filter-status";
+    status.setAttribute("aria-live", "polite");
+    brokerageFilterBar.append(button, status);
+    document.body.prepend(brokerageFilterBar);
   }
 
   // ---------- טקסט של מודעה בודדת ----------
@@ -269,14 +347,17 @@
     const ppsm = mkBadge("lr-ppsm", "מחיר למ״ר");
     const deal = mkBadge("lr-dealtag", "");
     const amenityAlert = document.createElement("div");
+    const cacheNote = document.createElement("div");
     amenityAlert.className = "lr-amenity-alert";
+    cacheNote.className = "lr-cache-note";
     amenityAlert.setAttribute("role", "alert");
     amenityAlert.hidden = true;
+    cacheNote.hidden = true;
     deal.hidden = true;
     deal._v.textContent = "⭐ שווה בדיקה";
     setBadge(rail, "loading", "ממתין…");
     setBadge(ppsm, "loading", "…");
-    wrap.append(amenityAlert, rail, ppsm, deal);
+    wrap.append(amenityAlert, cacheNote, rail, ppsm, deal);
 
     if (kind === "single") {
       document.body.appendChild(wrap);
@@ -293,7 +374,10 @@
       ppsm,
       deal,
       amenityAlert,
+      cacheNote,
+      brokerageRemoved: false,
       amenities: null,
+      listingId: null,
       getText: kind === "single" ? mainText : () => textOf(card, 3000),
       info: null,
       parsed: null,
@@ -396,6 +480,92 @@
     return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
   }
 
+  function cacheKeyForListing(id) {
+    return `${IS_YAD2 ? "yad2" : "madlan"}:${id}`;
+  }
+
+  function validCachedAmenities(record, now = Date.now()) {
+    return (
+      record &&
+      record.amenities &&
+      Number.isFinite(record.updatedAt) &&
+      now - record.updatedAt < LISTING_CACHE_TTL_MS &&
+      Object.values(record.amenities).some((value) => typeof value === "boolean")
+    );
+  }
+
+  function trimListingCache(cache, now = Date.now()) {
+    const fresh = Object.entries(cache || {}).filter(([, record]) =>
+      validCachedAmenities(record, now)
+    );
+    fresh.sort((a, b) => b[1].updatedAt - a[1].updatedAt);
+    return Object.fromEntries(fresh.slice(0, LISTING_CACHE_MAX_ITEMS));
+  }
+
+  function saveListingCache() {
+    clearTimeout(cacheSaveTimer);
+    cacheSaveTimer = setTimeout(() => {
+      listingCache = trimListingCache(listingCache);
+      chrome.storage.local.set({ [LISTING_CACHE_KEY]: listingCache }, () => {
+        if (chrome.runtime.lastError) {
+          console.warn("[lightrail-ext] failed to save listing cache", chrome.runtime.lastError.message);
+        }
+      });
+    }, 500);
+  }
+
+  function rememberListingAmenities(id, amenities) {
+    const key = id ? cacheKeyForListing(id) : null;
+    if (
+      !id ||
+      cacheWriteSuppressedIds.has(key) ||
+      !amenities ||
+      !Object.values(amenities).every((value) => typeof value === "boolean")
+    ) {
+      return;
+    }
+    const existing = listingCache[key];
+    if (
+      existing &&
+      Object.keys(amenities).every((amenity) => existing.amenities[amenity] === amenities[amenity]) &&
+      Object.keys(existing.amenities).length === Object.keys(amenities).length
+    ) {
+      if (Date.now() - existing.updatedAt >= 24 * 60 * 60 * 1000) {
+        listingCache[key] = { ...existing, updatedAt: Date.now() };
+        saveListingCache();
+      }
+      return;
+    }
+    listingCache[key] = { amenities, updatedAt: Date.now() };
+    saveListingCache();
+  }
+
+  function renderCachedAmenities(entry) {
+    if (entry.kind !== "list" || !entry.cacheNote) return;
+    const record = entry.listingId ? listingCache[cacheKeyForListing(entry.listingId)] : null;
+    if (!validCachedAmenities(record) || CFG.requiredAmenities.length === 0) {
+      if (!entry.cacheNote.hidden) entry.cacheNote.hidden = true;
+      entry.card.classList.remove("lr-cache-missing");
+      return;
+    }
+    const missing = CFG.requiredAmenities
+      .filter((amenity) => record.amenities[amenity] !== true)
+      .map((amenity) => AMENITY_LABELS[amenity] || amenity);
+    const state = missing.length ? "missing" : "matches";
+    const text = missing.length
+      ? `נבדקה בעבר · חסר: ${missing.join(", ")}`
+      : "נבדקה בעבר · דרישות החובה קיימות";
+    const signature = `${record.updatedAt}|${state}|${text}`;
+    if (entry.cacheNote.dataset.signature !== signature) {
+      entry.cacheNote.dataset.signature = signature;
+      entry.cacheNote.dataset.state = state;
+      entry.cacheNote.textContent = text;
+      entry.cacheNote.title = `המאפיינים נבדקו בתאריך ${new Date(record.updatedAt).toLocaleDateString("he-IL")}`;
+    }
+    if (entry.cacheNote.hidden) entry.cacheNote.hidden = false;
+    entry.card.classList.toggle("lr-cache-missing", missing.length > 0);
+  }
+
   function refreshAll() {
     refreshTimer = null;
     const now = Date.now();
@@ -417,7 +587,17 @@
         entry.info = entry.parsed.ppsm ? entry.parsed : null;
       }
       const root = entry.kind === "single" ? document : entry.card;
-      entry.amenities = (IS_YAD2 ? LRYad2 : LRMadlan).readAmenities(root);
+      entry.listingId = (IS_YAD2 ? LRYad2 : LRMadlan).listingId(root);
+      const currentAmenities = (IS_YAD2 ? LRYad2 : LRMadlan).readAmenities(root);
+      if (entry.kind === "single" && currentAmenities) {
+        entry.amenities = currentAmenities;
+        rememberListingAmenities(entry.listingId, currentAmenities);
+      } else {
+        const cached = entry.listingId ? listingCache[cacheKeyForListing(entry.listingId)] : null;
+        entry.amenities = validCachedAmenities(cached) ? cached.amenities : currentAmenities;
+      }
+      renderCachedAmenities(entry);
+      filterBrokerageEntry(entry);
       const listingRoot =
         entry.kind === "single"
           ? document.querySelector("main") || document.body
@@ -433,9 +613,10 @@
         const notices = [];
         if (missing.length) notices.push(`אין בדירה: ${missing.join(", ")}`);
         if (unknown.length) notices.push(`לא ניתן לאמת: ${unknown.join(", ")}`);
-        entry.amenityAlert.hidden = notices.length === 0;
+        const notice = notices.length ? `שים לב! ${notices.join(" · ")}` : "";
+        if (entry.amenityAlert.hidden !== !notice) entry.amenityAlert.hidden = !notice;
         if (notices.length) {
-          entry.amenityAlert.textContent = `שים לב! ${notices.join(" · ")}`;
+          if (entry.amenityAlert.textContent !== notice) entry.amenityAlert.textContent = notice;
         }
       }
     }
@@ -538,6 +719,7 @@
       if (isDeal) deal.title = reasons.join(" · ");
       (entry.kind === "single" ? entry.wrap : entry.card).classList.toggle("lr-deal-card", isDeal);
     }
+    updateBrokerageFilterStatus();
   }
 
   function scheduleRefresh() {
@@ -589,6 +771,7 @@
   }
 
   function start() {
+    createBrokerageFilterBar();
     new MutationObserver(scheduleScan).observe(document.body, {
       childList: true,
       subtree: true,
@@ -625,15 +808,39 @@
   }
 
   try {
-    chrome.storage.local.get("lastMedian", (r) => {
+    chrome.storage.local.get(["lastMedian", LISTING_CACHE_KEY], (r) => {
       const m = r && r.lastMedian;
       if (m && Date.now() - m.at < 14 * 24 * 3600 * 1000) storedMedian = m;
+      if (chrome.runtime.lastError) {
+        console.warn("[lightrail-ext] failed to load listing cache", chrome.runtime.lastError.message);
+      } else {
+        const storedCache = (r && r[LISTING_CACHE_KEY]) || {};
+        listingCache = trimListingCache(storedCache);
+        if (Object.keys(listingCache).length !== Object.keys(storedCache).length) {
+          saveListingCache();
+        }
+        scheduleRefresh();
+      }
     });
     chrome.storage.sync.get(DEFAULTS, (s) => {
       applySettings(s || {});
       start();
     });
     chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === "local" && changes[LISTING_CACHE_KEY]) {
+        if (!changes[LISTING_CACHE_KEY].newValue) {
+          for (const entry of entries.values()) {
+            if (entry.listingId) cacheWriteSuppressedIds.add(cacheKeyForListing(entry.listingId));
+          }
+          if (main && !main.entry.listingId) {
+            const id = (IS_YAD2 ? LRYad2 : LRMadlan).listingId(document);
+            if (id) cacheWriteSuppressedIds.add(cacheKeyForListing(id));
+          }
+        }
+        listingCache = trimListingCache(changes[LISTING_CACHE_KEY].newValue);
+        scheduleRefresh();
+        return;
+      }
       if (area !== "sync") return;
       const next = {};
       for (const [k, v] of Object.entries(changes)) next[k] = v.newValue;
