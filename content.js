@@ -15,6 +15,8 @@
     avoidBrokerage: false,
     removeBrokerage: false,
     removeProjects: false,
+    disableYad2: false,
+    disableMadlan: false,
     requiredAmenities: ["secureRoom"],
   };
   const CFG = {
@@ -27,6 +29,7 @@
   const LISTING_CACHE_TTL_MS = 60 * 24 * 60 * 60 * 1000;
   const LISTING_CACHE_MAX_ITEMS = 2500;
   const IS_YAD2 = location.hostname.includes("yad2.co.il");
+  const SITE_DISABLE_KEY = IS_YAD2 ? "disableYad2" : "disableMadlan";
   let listingCache = {};
   let listingCacheLoaded = false;
   let pendingCacheSave = false;
@@ -47,6 +50,8 @@
   let main = null; // { entry, path } – המודעה של דף מודעה בודדת
   let scanTimer = null;
   let refreshTimer = null;
+  let pageObserver = null;
+  let isRunning = false;
   let pageBias = null; // המיקום האחרון שנמצא בדיוק, לעזרה בכתובות בלי עיר
   let storedMedian = null; // חציון מחיר למ"ר מחיפוש אחרון (לדפי מודעה בודדת)
   let removeBrokerageForPage = false;
@@ -515,7 +520,7 @@
 
   // ---------- חישוב רכבת (רק למודעות שנראות / קרובות למסך) ----------
   function startLookup(entry) {
-    if (entry.started) return;
+    if (!isRunning || entry.started) return;
     if (!listingCacheLoaded) {
       setTimeout(() => {
         if (entry.card.isConnected) startLookup(entry);
@@ -526,6 +531,7 @@
     const maxTries = entry.kind === "single" ? 5 : 3;
 
     const attempt = () => {
+      if (!isRunning || !entry.card.isConnected) return;
       const text = entry.getText();
       const root = entry.kind === "single" ? document : entry.card;
       const siteParser = IS_YAD2 ? LRYad2 : LRMadlan;
@@ -551,6 +557,7 @@
             ? cachedListing.coordinates
             : null;
         chrome.runtime.sendMessage({ type: "lookup", queries, bias: pageBias, coordinates }, (res) => {
+          if (!isRunning || !entry.card.isConnected) return;
           if (chrome.runtime.lastError) {
             renderRail(entry, { ok: false, reason: "error", error: chrome.runtime.lastError.message });
           } else {
@@ -687,6 +694,7 @@
   }
 
   function refreshAll() {
+    if (!isRunning) return;
     refreshTimer = null;
     const now = Date.now();
 
@@ -861,7 +869,7 @@
   }
 
   function scheduleRefresh() {
-    if (refreshTimer) return;
+    if (!isRunning || refreshTimer) return;
     refreshTimer = setTimeout(refreshAll, 250);
   }
 
@@ -893,6 +901,7 @@
   }
 
   function scan() {
+    if (!isRunning) return;
     scanTimer = null;
     try {
       ensureMain();
@@ -905,17 +914,60 @@
   }
 
   function scheduleScan() {
-    if (scanTimer) return;
+    if (!isRunning || scanTimer) return;
     scanTimer = setTimeout(scan, 600);
   }
 
   function start() {
+    if (isRunning) return;
+    isRunning = true;
     createBrokerageFilterBar();
-    new MutationObserver(scheduleScan).observe(document.body, {
+    pageObserver = new MutationObserver(scheduleScan);
+    pageObserver.observe(document.body, {
       childList: true,
       subtree: true,
     });
     scan();
+  }
+
+  function stop() {
+    if (!isRunning) return;
+    isRunning = false;
+    clearTimeout(scanTimer);
+    clearTimeout(refreshTimer);
+    scanTimer = null;
+    refreshTimer = null;
+    if (pageObserver) pageObserver.disconnect();
+    pageObserver = null;
+    io.disconnect();
+    for (const entry of entries.values()) {
+      if (entry.kind === "list") {
+        entry.card.classList.remove(
+          "lr-brokerage-removed",
+          "lr-cache-missing",
+          "lr-deal-card",
+          "lr-project-removed"
+        );
+        highlightBrokerage(entry.card, false);
+      }
+      entry.wrap.remove();
+    }
+    entries.clear();
+    projectCards.clear();
+    if (main) {
+      main.entry.wrap.remove();
+      main = null;
+    }
+    if (brokerageFilterBar) {
+      brokerageFilterBar.remove();
+      brokerageFilterBar = null;
+    }
+    highlightBrokerage(document.querySelector("main") || document.body, false);
+  }
+
+  function updateSiteState() {
+    if (CFG[SITE_DISABLE_KEY]) stop();
+    else start();
   }
 
   // טוענים את ההגדרות לפני שמתחילים, ומעדכנים את הדף מיד כשהמשתמש משנה הגדרה
@@ -967,7 +1019,7 @@
     });
     chrome.storage.sync.get(DEFAULTS, (s) => {
       applySettings(s || {});
-      start();
+      updateSiteState();
     });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === "local" && changes[LISTING_CACHE_KEY]) {
@@ -988,11 +1040,13 @@
       const next = {};
       for (const [k, v] of Object.entries(changes)) next[k] = v.newValue;
       applySettings(next);
+      updateSiteState();
+      if (!isRunning) return;
       processProjectCards();
       scheduleRefresh();
     });
   } catch {
     listingCacheLoaded = true;
-    start(); // אם האחסון לא זמין, ממשיכים עם ברירות המחדל
+    updateSiteState(); // אם האחסון לא זמין, ממשיכים עם ברירות המחדל
   }
 })();

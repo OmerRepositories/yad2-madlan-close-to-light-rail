@@ -7,12 +7,15 @@
     requireRail: true,
     nearM: 800,
     highlight: true,
+    disableFacebook: false,
   };
   const CFG = { ...DEFAULTS, MIN_SAMPLES: 5, ROOT_MARGIN: "600px" };
 
   const entries = new Map(); // article -> entry
   let scanTimer = null;
   let refreshTimer = null;
+  let pageObserver = null;
+  let isRunning = false;
   let pageBias = null;
 
   const fmtNum = (n) => Math.round(n).toLocaleString("he-IL");
@@ -198,7 +201,7 @@
   }
 
   function startLookup(entry) {
-    if (entry.started) return;
+    if (!isRunning || entry.started) return;
     entry.started = true;
     const text = postText(entry.article);
     const parsed = LR.parseFreeAddress(text, groupContext());
@@ -216,6 +219,7 @@
     setBadge(entry.rail, "loading", "מחשב…");
     try {
       chrome.runtime.sendMessage({ type: "lookup", queries, bias: pageBias }, (res) => {
+        if (!isRunning || !entry.article.isConnected) return;
         if (chrome.runtime.lastError) {
           renderRail(entry, { ok: false, reason: "error", error: chrome.runtime.lastError.message });
         } else {
@@ -249,6 +253,7 @@
   }
 
   function refreshAll() {
+    if (!isRunning) return;
     refreshTimer = null;
     const now = Date.now();
 
@@ -327,12 +332,13 @@
   }
 
   function scheduleRefresh() {
-    if (refreshTimer) return;
+    if (!isRunning || refreshTimer) return;
     refreshTimer = setTimeout(refreshAll, 300);
   }
 
   // ---------- סריקה ----------
   function scan() {
+    if (!isRunning) return;
     scanTimer = null;
     try {
       for (const art of findPosts()) {
@@ -376,13 +382,35 @@
   }
 
   function scheduleScan() {
-    if (scanTimer) return;
+    if (!isRunning || scanTimer) return;
     scanTimer = setTimeout(scan, 900);
   }
 
   function start() {
-    new MutationObserver(scheduleScan).observe(document.body, { childList: true, subtree: true });
+    if (isRunning) return;
+    isRunning = true;
+    pageObserver = new MutationObserver(scheduleScan);
+    pageObserver.observe(document.body, { childList: true, subtree: true });
     scan();
+  }
+
+  function stop() {
+    if (!isRunning) return;
+    isRunning = false;
+    clearTimeout(scanTimer);
+    clearTimeout(refreshTimer);
+    scanTimer = null;
+    refreshTimer = null;
+    if (pageObserver) pageObserver.disconnect();
+    pageObserver = null;
+    io.disconnect();
+    for (const entry of entries.values()) entry.wrap.remove();
+    entries.clear();
+  }
+
+  function updateSiteState() {
+    if (CFG.disableFacebook) stop();
+    else start();
   }
 
   const NUM_KEYS = ["maxPpsm", "belowMedianPct", "nearM"];
@@ -403,9 +431,11 @@
       const next = {};
       for (const [k, v] of Object.entries(changes)) next[k] = v.newValue;
       applySettings(next);
+      updateSiteState();
+      if (!isRunning) return;
       scheduleRefresh();
     });
   } catch {
-    start();
+    updateSiteState();
   }
 })();
