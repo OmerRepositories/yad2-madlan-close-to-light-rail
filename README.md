@@ -19,10 +19,6 @@
 3. לחץ **Load unpacked** ובחר את התיקייה `lightrail-ext`
 4. אם התוסף כבר מותקן: לחץ על כפתור הרענון שלו ורענן את דף האתר
 
-## כלי נפרד: ייצוא פוסטים מפייסבוק
-
-בתיקייה [`facebook-post-exporter`](./facebook-post-exporter/) נמצא תוסף Chrome נפרד שמרכז לקובץ TXT טקסט של פוסטים בקבוצת פייסבוק, לאחר שהם נכנסו למסך בזמן גלילה. הוראות ההתקנה והשימוש נמצאות ב-[README של כלי הייצוא](./facebook-post-exporter/README.md). כלי זה אינו חלק מפעולת תוסף הרכבת הקלה, וה־Release של התוסף הראשי אינו כולל אותו.
-
 ## Releases
 
 בכל push לענף `main` מתבצעת בדיקה של `version` בקובץ `manifest.json`. אם הגרסה בפורמט `MAJOR.MINOR.PATCH` גבוהה מהגרסה האחרונה שפורסמה, GitHub Actions יוצר Release עם תג מתאים וקובץ ZIP להתקנה. כדי לפרסם גרסה חדשה יש לעדכן קודם את `version` ב־`manifest.json` ולדחוף את השינוי לענף `main`.
