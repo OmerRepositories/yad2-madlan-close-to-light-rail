@@ -130,12 +130,26 @@ var LRYad2 = (() => {
           .toLowerCase();
       const focusedAddress = streetName(addressText);
       const candidateStreetName = streetName(cardAddress.street);
+      const houseNumberValue = (street) => {
+        const match = String(street || "").match(/\s(\d{1,4}[א-ת]?)$/);
+        return match ? match[1].replace(/\s+/g, "").toLowerCase() : null;
+      };
+      const focusedNumber = houseNumberValue(parsed.street);
+      const candidateNumber = houseNumberValue(cardAddress.street);
+      const hasConflictingHouseNumbers =
+        focusedNumber && candidateNumber && focusedNumber !== candidateNumber;
+      const addsLocationContext =
+        (cardAddress.city && !parsed.city) || (cardAddress.hood && !parsed.hood);
+      const canEnrichAddress =
+        !parsed.street ||
+        (!houseNumber(parsed.street) &&
+          candidateStreetName.includes(streetName(parsed.street))) ||
+        addsLocationContext;
       if (
         houseNumber(cardAddress.street) &&
         focusedAddress.includes(candidateStreetName) &&
-        (!parsed.street ||
-          (!houseNumber(parsed.street) &&
-            candidateStreetName.includes(streetName(parsed.street))))
+        !hasConflictingHouseNumbers &&
+        canEnrichAddress
       ) {
         parsed = {
           ...cardAddress,
