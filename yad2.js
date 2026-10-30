@@ -100,21 +100,53 @@ var LRYad2 = (() => {
 
   function readAddress(root, text, ctxCity, single) {
     const place = placeFromData(root);
+    let parsed;
+    let coordinates = null;
+    let addressText = text;
     if (place) {
-      return {
-        ...LR.parseAddress(`${place.street}, ${place.hood || ""}, ${place.city}`, ctxCity),
-        coordinates: place.coordinates,
-      };
+      addressText = `${place.street}, ${place.hood || ""}, ${place.city}`;
+      parsed = LR.parseAddress(
+        addressText,
+        ctxCity
+      );
+      coordinates = place.coordinates;
+    } else {
+      const addressElement = root.querySelector(
+        '[data-testid="address"], [data-testid="ad-card-address"]'
+      );
+      addressText = addressElement ? addressElement.innerText : text;
+      parsed = single
+        ? LR.parseAny(addressText, ctxCity)
+        : LR.parseAddress(addressText, ctxCity);
     }
 
-    const addressElement = root.querySelector(
-      '[data-testid="address"], [data-testid="ad-card-address"]'
-    );
-    const addressText = addressElement ? addressElement.innerText : text;
-    const parsed = single
-      ? LR.parseAny(addressText, ctxCity)
-      : LR.parseAddress(addressText, ctxCity);
-    return { ...parsed, coordinates: null };
+    if (!single && text) {
+      const cardAddress = LR.parseAddress(text, ctxCity);
+      const houseNumber = (street) => /\s\d{1,4}[א-ת]?$/.test(street || "");
+      const streetName = (street) =>
+        String(street || "")
+          .replace(/\s+\d{1,4}[א-ת]?$/, "")
+          .replace(/[\s"'׳״-]/g, "")
+          .toLowerCase();
+      const focusedAddress = streetName(addressText);
+      const candidateStreetName = streetName(cardAddress.street);
+      if (
+        houseNumber(cardAddress.street) &&
+        focusedAddress.includes(candidateStreetName) &&
+        (!parsed.street ||
+          (!houseNumber(parsed.street) &&
+            candidateStreetName.includes(streetName(parsed.street))))
+      ) {
+        parsed = {
+          ...cardAddress,
+          queries: [...cardAddress.queries, ...parsed.queries].filter(
+            (query, index, queries) => queries.findIndex((item) => item.q === query.q) === index
+          ),
+        };
+      }
+    }
+
+    return { ...parsed, coordinates };
   }
 
   const AMENITY_TEST_IDS = {
