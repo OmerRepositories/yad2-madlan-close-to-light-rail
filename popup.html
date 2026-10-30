@@ -7,91 +7,110 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <h1>🚆 מה נחשב "מודעה שווה"?</h1>
-  <p class="hint">מודעה שעומדת בכל התנאים שסימנת תקבל מסגרת כתומה ותג ⭐</p>
+  <h1>הגדרות התוסף</h1>
+  <p class="hint">בחר אילו חישובים והדגשות להציג ביד2 ובמדלן.</p>
 
-  <label class="row switch">
-    <input type="checkbox" id="highlight">
-    <span>להדגיש מודעות שוות</span>
-  </label>
+  <details class="settings-section" open>
+    <summary>חישובים (יד2 ומדלן)</summary>
+    <div class="section-content">
+      <label class="row switch">
+        <input type="checkbox" id="calculatePpsm">
+        <span>לחשב ולהציג מחיר למ״ר</span>
+      </label>
+      <fieldset id="ppsmSettings">
+        <legend>תנאי מחיר למ״ר להדגשת מודעה</legend>
+        <label class="field">
+          <span>מחיר מקסימלי למ״ר (₪)</span>
+          <input type="number" id="maxPpsm" min="0" step="500" placeholder="למשל 30000">
+        </label>
+        <p class="small">0 או ריק = ללא הגבלה.</p>
+        <label class="field">
+          <span>זול מחציון הדף ב-% לפחות</span>
+          <input type="number" id="belowMedianPct" min="0" max="90" step="1" placeholder="למשל 10">
+        </label>
+        <p class="small">0 = לא פעיל. החציון מחושב על המודעות בדף.</p>
+      </fieldset>
 
-  <label class="row switch">
-    <input type="checkbox" id="avoidBrokerage">
-    <span>פחות עדיף תיווך — להבליט את המילה במודעה</span>
-  </label>
-  <label class="row switch">
-    <input type="checkbox" id="removeBrokerage">
-    <span>להסיר מודעות תיווך תמיד</span>
-  </label>
-  <p class="small">אפשר גם להסיר תיווך רק לעמוד הנוכחי באמצעות הכפתור שבראש עמוד החיפוש.</p>
-  <label class="row switch">
-    <input type="checkbox" id="removeProjects">
-    <span>להסיר פרויקטים תמיד</span>
-  </label>
-  <p class="small">אפשר גם להסיר פרויקטים רק בעמוד הנוכחי באמצעות הכפתור שבראש עמוד החיפוש.</p>
-
-  <fieldset>
-    <legend>השבתת התוסף באתרים</legend>
-    <p class="small">באתר מסומן התוסף לא יציג תגים ולא ינתח מודעות. אפשר להפעיל אותו שוב בכל עת.</p>
-    <label class="row switch">
-      <input type="checkbox" id="disableYad2">
-      <span>להשבית ביד2</span>
-    </label>
-    <label class="row switch">
-      <input type="checkbox" id="disableMadlan">
-      <span>להשבית במדלן</span>
-    </label>
-    <label class="row switch">
-      <input type="checkbox" id="disableFacebook">
-      <span>להשבית בפייסבוק</span>
-    </label>
-  </fieldset>
-
-  <fieldset>
-    <legend>מחיר למ״ר</legend>
-
-    <label class="field">
-      <span>מחיר מקסימלי למ״ר (₪)</span>
-      <input type="number" id="maxPpsm" min="0" step="500" placeholder="למשל 30000">
-    </label>
-    <p class="small">השאר ריק או 0 כדי לא להגביל.</p>
-
-    <label class="field">
-      <span>זול מחציון הדף ב-% לפחות</span>
-      <input type="number" id="belowMedianPct" min="0" max="90" step="1" placeholder="למשל 10">
-    </label>
-    <p class="small">החציון מחושב על המודעות שבדף. 0 = לא פעיל.</p>
-  </fieldset>
-
-  <fieldset>
-    <legend>רכבת קלה</legend>
-
-    <label class="row switch">
-      <input type="checkbox" id="requireRail">
-      <span>מודעה שווה רק אם היא קרובה לרכבת הקלה</span>
-    </label>
-    <p class="small">כשהאפשרות מסומנת, מודעה רחוקה מהמרחק שיוגדר לא תקבל ⭐ „שווה בדיקה”.</p>
-
-    <label class="field">
-      <span>מרחק מקסימלי מתחנת רכבת קלה (מטרים)</span>
-      <input type="number" id="nearM" min="100" step="50" placeholder="800">
-    </label>
-  </fieldset>
-
-  <fieldset>
-    <legend>מאפיינים שחובה במודעה</legend>
-    <p class="small">מודעה שחסר בה מאפיין מסומן תציג אזהרה בעמוד המודעה ולא תסומן כשווה.</p>
-    <div id="requiredAmenities" class="amenities"></div>
-  </fieldset>
-
-  <fieldset>
-    <legend>מטמון בדיקות מודעות</legend>
-    <p class="small">נשמרים מקומית מזהה מודעת יד2/מדלן ומצבי המאפיינים שנבדקו. המטמון לא מסונכרן ולא משפיע על ההעדפות.</p>
-    <div class="cache-actions">
-      <button id="clearListingCache" type="button">מחיקת מידע שמור</button>
-      <span id="cacheStatus" aria-live="polite"></span>
+      <label class="row switch">
+        <input type="checkbox" id="calculateRail">
+        <span>לחשב ולהציג מרחק מהרכבת הקלה</span>
+      </label>
+      <fieldset id="railSettings">
+        <legend>תנאי רכבת להדגשת מודעה</legend>
+        <label class="row switch">
+          <input type="checkbox" id="requireRail">
+          <span>מודעה שווה רק אם היא קרובה לרכבת</span>
+        </label>
+        <label class="field">
+          <span>מרחק מקסימלי מתחנת רכבת (מטרים)</span>
+          <input type="number" id="nearM" min="100" step="50" placeholder="800">
+        </label>
+      </fieldset>
+      <p class="small">כיבוי חישוב מסתיר את התג ומבטל גם את התנאי המתאים בהדגשת מודעות.</p>
     </div>
-  </fieldset>
+  </details>
+
+  <details class="settings-section">
+    <summary>הדגשות וסינון</summary>
+    <div class="section-content">
+      <label class="row switch">
+        <input type="checkbox" id="highlight">
+        <span>להדגיש מודעות שוות</span>
+      </label>
+      <label class="row switch">
+        <input type="checkbox" id="avoidBrokerage">
+        <span>פחות עדיף תיווך — להבליט את המילה במודעה</span>
+      </label>
+      <label class="row switch">
+        <input type="checkbox" id="removeBrokerage">
+        <span>להסיר מודעות תיווך תמיד</span>
+      </label>
+      <p class="small">אפשר גם להסיר תיווך רק לעמוד הנוכחי באמצעות הכפתור בראש עמוד החיפוש.</p>
+      <label class="row switch">
+        <input type="checkbox" id="removeProjects">
+        <span>להסיר פרויקטים תמיד</span>
+      </label>
+      <p class="small">אפשר גם להסיר פרויקטים רק בעמוד הנוכחי באמצעות הכפתור בראש עמוד החיפוש.</p>
+    </div>
+  </details>
+
+  <details class="settings-section">
+    <summary>אתרים פעילים</summary>
+    <div class="section-content">
+      <p class="small">באתר מושבת התוסף לא יציג תגים ולא ינתח מודעות.</p>
+      <label class="row switch">
+        <input type="checkbox" id="disableYad2">
+        <span>להשבית ביד2</span>
+      </label>
+      <label class="row switch">
+        <input type="checkbox" id="disableMadlan">
+        <span>להשבית במדלן</span>
+      </label>
+      <label class="row switch">
+        <input type="checkbox" id="disableFacebook">
+        <span>להשבית בפייסבוק</span>
+      </label>
+    </div>
+  </details>
+
+  <details class="settings-section">
+    <summary>מאפיינים שחובה במודעה</summary>
+    <div class="section-content">
+      <p class="small">מאפיין חסר יציג אזהרה בעמוד המודעה ולא יאפשר לסמן אותה כשווה.</p>
+      <div id="requiredAmenities" class="amenities"></div>
+    </div>
+  </details>
+
+  <details class="settings-section">
+    <summary>מטמון בדיקות מודעות</summary>
+    <div class="section-content">
+      <p class="small">המטמון נשמר מקומית ואינו מסונכרן עם ההעדפות.</p>
+      <div class="cache-actions">
+        <button id="clearListingCache" type="button">מחיקת מידע שמור</button>
+        <span id="cacheStatus" aria-live="polite"></span>
+      </div>
+    </div>
+  </details>
 
   <div class="actions">
     <button id="reset" type="button">איפוס לברירת מחדל</button>

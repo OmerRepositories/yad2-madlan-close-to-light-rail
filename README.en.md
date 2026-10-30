@@ -30,6 +30,7 @@ Click the extension icon in Chrome's toolbar. Settings are saved automatically a
 - **Maximum price per square meter (₪)** — for example, `30000`. `0` or blank disables the limit.
 - **At least this percentage below the page median** — `0` disables this rule.
 - **Require proximity to light rail** and set the **maximum distance** from a station.
+- **Yad2 and Madlan calculations** — independently turn off price-per-square-meter or light-rail calculations. The corresponding badge is hidden, the calculation is skipped, and its criteria are ignored when highlighting listings.
 - **Highlight good listings** — displays a badge and orange outline when all enabled requirements are met.
 - **Brokerage is less preferred** — highlights mentions of brokerage and real-estate terms; Yad2's agent label above the price is highlighted too. Positive phrases such as “without brokerage” are shown as positive.
 - **Always remove brokerage listings** — automatically hides listings detected as brokerage. Alternatively, use the button at the top of a search page to hide them only for the current page; this temporary filter is not retained after a refresh.

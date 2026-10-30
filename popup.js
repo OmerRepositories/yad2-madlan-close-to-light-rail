@@ -2,6 +2,8 @@
 const DEFAULTS = {
   maxPpsm: 0,
   belowMedianPct: 10,
+  calculatePpsm: true,
+  calculateRail: true,
   requireRail: true,
   nearM: 800,
   highlight: true,
@@ -34,6 +36,8 @@ const LISTING_CACHE_TTL_MS = 60 * 24 * 60 * 60 * 1000;
 const numberKeys = ["maxPpsm", "belowMedianPct", "nearM"];
 const boolKeys = [
   "requireRail",
+  "calculatePpsm",
+  "calculateRail",
   "highlight",
   "avoidBrokerage",
   "removeBrokerage",
@@ -57,6 +61,10 @@ function fill(s) {
 
 // כשמבטלים את הדרישה לרכבת, שדה המרחק לא רלוונטי
 function syncDisabled() {
+  const calculatePpsm = $("calculatePpsm").checked;
+  const calculateRail = $("calculateRail").checked;
+  $("ppsmSettings").disabled = !calculatePpsm;
+  $("railSettings").disabled = !calculateRail;
   $("nearM").disabled = !$("requireRail").checked;
 }
 

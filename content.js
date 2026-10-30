@@ -9,6 +9,8 @@
   const DEFAULTS = {
     maxPpsm: 0, // מחיר מקסימלי למ"ר שנחשב "שווה" (0 = לא פעיל)
     belowMedianPct: 10, // כמה אחוזים זול מחציון הדף (0 = לא פעיל)
+    calculatePpsm: true, // להציג ולחשב מחיר למ"ר ביד2 ובמדלן
+    calculateRail: true, // להציג ולחשב מרחק מהרכבת ביד2 ובמדלן
     requireRail: true, // לדרוש קרבה לרכבת
     nearM: 800, // מרחק מקסימלי מהרכבת במטרים
     highlight: true, // להדגיש מודעות שוות (מסגרת + תג)
@@ -430,6 +432,8 @@
 
     const rail = mkBadge("lr-rail", "מרחק מהרכבת");
     const ppsm = mkBadge("lr-ppsm", "מחיר למ״ר");
+    rail.hidden = !CFG.calculateRail;
+    ppsm.hidden = !CFG.calculatePpsm;
     const deal = mkBadge("lr-dealtag", "");
     const amenityAlert = document.createElement("div");
     const cacheNote = document.createElement("div");
@@ -520,7 +524,7 @@
 
   // ---------- חישוב רכבת (רק למודעות שנראות / קרובות למסך) ----------
   function startLookup(entry) {
-    if (!isRunning || entry.started) return;
+    if (!isRunning || !CFG.calculateRail || entry.started) return;
     if (!listingCacheLoaded) {
       setTimeout(() => {
         if (entry.card.isConnected) startLookup(entry);
@@ -531,7 +535,7 @@
     const maxTries = entry.kind === "single" ? 5 : 3;
 
     const attempt = () => {
-      if (!isRunning || !entry.card.isConnected) return;
+      if (!isRunning || !CFG.calculateRail || !entry.card.isConnected) return;
       const text = entry.getText();
       const root = entry.kind === "single" ? document : entry.card;
       const siteParser = IS_YAD2 ? LRYad2 : LRMadlan;
@@ -557,7 +561,7 @@
             ? cachedListing.coordinates
             : null;
         chrome.runtime.sendMessage({ type: "lookup", queries, bias: pageBias, coordinates }, (res) => {
-          if (!isRunning || !entry.card.isConnected) return;
+          if (!isRunning || !CFG.calculateRail || !entry.card.isConnected) return;
           if (chrome.runtime.lastError) {
             renderRail(entry, { ok: false, reason: "error", error: chrome.runtime.lastError.message });
           } else {
@@ -571,6 +575,33 @@
       }
     };
     attempt();
+  }
+
+  function syncCalculationState({ ppsmChanged = false, railChanged = false } = {}) {
+    for (const entry of entries.values()) {
+      if (ppsmChanged) entry.ppsm.hidden = !CFG.calculatePpsm;
+      if (ppsmChanged && !CFG.calculatePpsm) {
+        entry.info = null;
+        entry.parsed = null;
+        entry.delta = null;
+        entry.priceTries = 0;
+        entry.lastTry = 0;
+      }
+
+      if (!railChanged) continue;
+      entry.rail.hidden = !CFG.calculateRail;
+      if (!CFG.calculateRail) {
+        io.unobserve(entry.card);
+        entry.started = false;
+        entry.tries = 0;
+        entry.res = null;
+        entry.tried = [];
+      } else if (isRunning) {
+        if (entry.kind === "single") startLookup(entry);
+        else io.observe(entry.card);
+      }
+    }
+    scheduleRefresh();
   }
 
   // ---------- מחיר למ"ר, חציון והדגשה ----------
@@ -705,7 +736,12 @@
         entries.delete(key);
         continue;
       }
-      if (!entry.info && entry.priceTries < 8 && now - entry.lastTry > 1500) {
+      if (!CFG.calculatePpsm) {
+        entry.info = null;
+        entry.parsed = null;
+        entry.delta = null;
+        entry.ppsm.hidden = true;
+      } else if (!entry.info && entry.priceTries < 8 && now - entry.lastTry > 1500) {
         entry.priceTries++;
         entry.lastTry = now;
         const text = entry.getText();
@@ -769,11 +805,13 @@
 
     // חציון מחיר למ"ר של המודעות ברשימה
     const values = [];
-    for (const e of entries.values()) if (e.kind === "list" && e.info) values.push(e.info.ppsm);
+    for (const e of entries.values()) {
+      if (CFG.calculatePpsm && e.kind === "list" && e.info) values.push(e.info.ppsm);
+    }
     const med = values.length >= CFG.MIN_SAMPLES ? median(values) : null;
 
     // שומרים את החציון לשימוש בדף מודעה בודדת (רק כשנמצאים בדף רשימה)
-    if (med && !main && (!storedMedian || Math.abs(storedMedian.value - med) / med > 0.01)) {
+    if (CFG.calculatePpsm && med && !main && (!storedMedian || Math.abs(storedMedian.value - med) / med > 0.01)) {
       storedMedian = { value: med, n: values.length, at: now };
       try {
         chrome.storage.local.set({ lastMedian: storedMedian });
@@ -797,7 +835,7 @@
 
       // ---- מחיר למ"ר ----
       entry.delta = null;
-      if (info) {
+      if (CFG.calculatePpsm && info) {
         let sub = "";
         let state = "neutral";
         if (refMed) {
@@ -819,7 +857,7 @@
               ? ` ${refLabel}: ₪${fmtNum(refMed)}.`
               : ` צריך לפחות ${CFG.MIN_SAMPLES} מודעות בדף כדי להשוות לחציון.`)
         );
-      } else if (parsed && parsed.reason) {
+      } else if (CFG.calculatePpsm && parsed && parsed.reason) {
         setBadge(
           ppsm,
           "none",
@@ -836,16 +874,16 @@
       let ok = true;
 
       const nearRail = Boolean(res && res.ok && !res.approx && res.meters <= CFG.nearM);
-      if (CFG.requireRail) {
+      if (CFG.calculateRail && CFG.requireRail) {
         ok = ok && nearRail;
         if (nearRail) reasons.push(`עד ${CFG.nearM} מ׳ מהרכבת הקלה`);
       }
-      if (CFG.maxPpsm > 0) {
+      if (CFG.calculatePpsm && CFG.maxPpsm > 0) {
         const pass = Boolean(info && info.ppsm <= CFG.maxPpsm);
         ok = ok && pass;
         if (pass) reasons.push(`עד ₪${fmtNum(CFG.maxPpsm)} למ״ר`);
       }
-      if (CFG.belowMedianPct > 0) {
+      if (CFG.calculatePpsm && CFG.belowMedianPct > 0) {
         const pass = entry.delta !== null && entry.delta <= -CFG.belowMedianPct / 100;
         ok = ok && pass;
         if (pass) reasons.push(`${Math.round(-entry.delta * 100)}% מתחת לחציון`);
@@ -855,9 +893,9 @@
       }
       // בלי אף תנאי פעיל לא מדגישים כלום
       const hasRule =
-        CFG.requireRail ||
-        CFG.maxPpsm > 0 ||
-        CFG.belowMedianPct > 0 ||
+        (CFG.calculateRail && CFG.requireRail) ||
+        (CFG.calculatePpsm && CFG.maxPpsm > 0) ||
+        (CFG.calculatePpsm && CFG.belowMedianPct > 0) ||
         CFG.requiredAmenities.length > 0;
       const isDeal = Boolean(CFG.highlight && hasRule && ok);
 
@@ -878,7 +916,7 @@
     if (entries.has(card)) return;
     const entry = createEntry(card, "list");
     entries.set(card, entry);
-    io.observe(card);
+    if (CFG.calculateRail) io.observe(card);
     setTimeout(scheduleRefresh, 1500); // לתפוס כרטיסים שנטענים בהדרגה
   }
 
@@ -1020,6 +1058,7 @@
     chrome.storage.sync.get(DEFAULTS, (s) => {
       applySettings(s || {});
       updateSiteState();
+      syncCalculationState({ ppsmChanged: true, railChanged: true });
     });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === "local" && changes[LISTING_CACHE_KEY]) {
@@ -1041,6 +1080,12 @@
       for (const [k, v] of Object.entries(changes)) next[k] = v.newValue;
       applySettings(next);
       updateSiteState();
+      if ("calculatePpsm" in changes || "calculateRail" in changes) {
+        syncCalculationState({
+          ppsmChanged: "calculatePpsm" in changes,
+          railChanged: "calculateRail" in changes,
+        });
+      }
       if (!isRunning) return;
       processProjectCards();
       scheduleRefresh();
