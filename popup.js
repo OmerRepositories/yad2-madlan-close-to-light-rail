@@ -33,6 +33,34 @@ const AMENITIES = [
 const $ = (id) => document.getElementById(id);
 const LISTING_CACHE_KEY = "yad2AmenityCache_v1";
 const LISTING_CACHE_TTL_MS = 60 * 24 * 60 * 60 * 1000;
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+
+function selectTab(tab, focus = false) {
+  for (const item of tabs) {
+    const selected = item === tab;
+    item.setAttribute("aria-selected", String(selected));
+    item.tabIndex = selected ? 0 : -1;
+    const panel = document.getElementById(item.getAttribute("aria-controls"));
+    panel.hidden = !selected;
+  }
+  if (focus) tab.focus();
+}
+
+for (const tab of tabs) {
+  tab.addEventListener("click", () => selectTab(tab));
+  tab.addEventListener("keydown", (event) => {
+    const index = tabs.indexOf(tab);
+    let nextIndex = index;
+    if (event.key === "ArrowLeft") nextIndex = (index + 1) % tabs.length;
+    else if (event.key === "ArrowRight") nextIndex = (index - 1 + tabs.length) % tabs.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = tabs.length - 1;
+    else return;
+    event.preventDefault();
+    selectTab(tabs[nextIndex], true);
+  });
+}
+
 const numberKeys = ["maxPpsm", "belowMedianPct", "nearM"];
 const boolKeys = [
   "requireRail",

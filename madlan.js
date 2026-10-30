@@ -24,6 +24,10 @@ var LRMadlan = (() => {
     return match ? match[1] : null;
   }
 
+  function isProjectPage(path) {
+    return /^\/projects\/[^/]+\/?$/.test(path);
+  }
+
   function decodeJsonString(value) {
     try {
       return JSON.parse(`"${value}"`);
@@ -148,5 +152,5 @@ var LRMadlan = (() => {
     return result;
   }
 
-  return { listingId, readAddress, extractPriceSqm, readAmenities };
+  return { listingId, readAddress, extractPriceSqm, readAmenities, isProjectPage };
 })();

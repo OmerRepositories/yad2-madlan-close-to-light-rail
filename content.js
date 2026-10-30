@@ -5,7 +5,10 @@
 // תלוי ב-parse.js (משתנה גלובלי LR).
 (() => {
   const IS_YAD2 = location.hostname.includes("yad2.co.il");
-  if (IS_YAD2 && LRYad2.isProjectPage(location.pathname)) return;
+  const isProjectDetailPage = () =>
+    IS_YAD2
+      ? LRYad2.isProjectPage(location.pathname)
+      : LRMadlan.isProjectPage(location.pathname);
 
   // ===== הגדרות =====
   // ברירות המחדל זהות ל-popup.js. המשתמש משנה אותן דרך חלון ההגדרות של התוסף.
@@ -289,6 +292,7 @@
   }
 
   function processProjectCards() {
+    if (isProjectDetailPage()) return;
     for (const card of projectCards) {
       if (!card.isConnected) projectCards.delete(card);
     }
@@ -301,7 +305,11 @@
   }
 
   function createBrokerageFilterBar() {
-    if (brokerageFilterBar || LISTING_HREF.test(location.pathname)) return;
+    if (
+      brokerageFilterBar ||
+      LISTING_HREF.test(location.pathname) ||
+      isProjectDetailPage()
+    ) return;
     brokerageFilterBar = document.createElement("div");
     brokerageFilterBar.id = "lr-brokerage-filter";
     const brokerageButton = document.createElement("button");
@@ -605,6 +613,7 @@
 
       if (!railChanged) continue;
       entry.rail.hidden = !CFG.calculateRail;
+      if (entry.projectPage) entry.wrap.hidden = !CFG.calculateRail;
       if (!CFG.calculateRail) {
         io.unobserve(entry.card);
         entry.started = false;
@@ -749,6 +758,13 @@
       if (!key.isConnected) {
         io.unobserve(key);
         entries.delete(key);
+        continue;
+      }
+      if (entry.projectPage) {
+        entry.ppsm.hidden = true;
+        entry.deal.hidden = true;
+        entry.amenityAlert.hidden = true;
+        entry.cacheNote.hidden = true;
         continue;
       }
       if (!CFG.calculatePpsm) {
@@ -938,15 +954,24 @@
   // דף מודעה בודדת: פאנל צף עם אותם נתונים
   function ensureMain() {
     const isItem = LISTING_HREF.test(location.pathname);
-    if (main && (!isItem || main.path !== location.pathname)) {
+    const isProject = isProjectDetailPage();
+    if (main && ((!isItem && !isProject) || main.path !== location.pathname)) {
       main.entry.wrap.remove();
       entries.delete(main.entry.card);
       main = null;
     }
-    if (!isItem || main) return;
+    if ((!isItem && !isProject) || main) return;
     if (!document.querySelector("h1") && (document.body.innerText || "").length < 300) return; // עוד לא נטען
 
     const entry = createEntry(null, "single");
+    entry.projectPage = isProject;
+    if (isProject) {
+      entry.wrap.hidden = !CFG.calculateRail;
+      entry.ppsm.hidden = true;
+      entry.deal.hidden = true;
+      entry.amenityAlert.hidden = true;
+      entry.cacheNote.hidden = true;
+    }
     entries.set(entry.card, entry);
     main = { entry, path: location.pathname };
     setTimeout(() => startLookup(entry), 800);
@@ -958,8 +983,10 @@
     scanTimer = null;
     try {
       ensureMain();
-      findCards().forEach(processCard);
-      processProjectCards();
+      if (!isProjectDetailPage()) {
+        findCards().forEach(processCard);
+        processProjectCards();
+      }
       scheduleRefresh();
     } catch (e) {
       console.warn("[lightrail-ext] scan failed", e);

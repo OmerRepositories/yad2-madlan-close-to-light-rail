@@ -73,9 +73,22 @@ test("city-only geocoding queries are explicitly marked as not being an address"
   });
 });
 
-test("Yad2 first-hand project detail pages are recognized and excluded", () => {
+test("Yad2 first-hand project detail pages are recognized", () => {
   assert.equal(context.LRYad2.isProjectPage("/yad1/project/18636"), true);
   assert.equal(context.LRYad2.isProjectPage("/yad1/project/18636/"), true);
   assert.equal(context.LRYad2.isProjectPage("/realestate/item/center-and-sharon/v3y00p91"), false);
   assert.equal(context.LRYad2.isProjectPage("/yad1/project/"), false);
+});
+
+test("Madlan project detail pages are recognized", () => {
+  const madlanContext = { LR, document: { scripts: [] }, URL };
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "madlan.js"), "utf8"),
+    madlanContext
+  );
+
+  assert.equal(madlanContext.LRMadlan.isProjectPage("/projects/example_project"), true);
+  assert.equal(madlanContext.LRMadlan.isProjectPage("/projects/example_project/"), true);
+  assert.equal(madlanContext.LRMadlan.isProjectPage("/listings/listing-id"), false);
+  assert.equal(madlanContext.LRMadlan.isProjectPage("/projects/"), false);
 });

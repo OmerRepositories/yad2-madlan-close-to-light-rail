@@ -6,6 +6,7 @@
   margin: 6px 8px;
   direction: rtl;
 }
+.lr-wrap[hidden] { display: none !important; }
 
 .lr-badge {
   display: inline-flex;

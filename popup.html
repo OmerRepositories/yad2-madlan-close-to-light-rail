@@ -7,12 +7,46 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <h1>הגדרות התוסף</h1>
-  <p class="hint">בחר אילו חישובים והדגשות להציג ביד2 ובמדלן.</p>
+  <header class="popup-header">
+    <div class="brand-mark" aria-hidden="true">🚈</div>
+    <div>
+      <h1>הגדרות התוסף</h1>
+      <p class="hint">התאמה אישית של חיפוש הנכס שלך</p>
+    </div>
+  </header>
 
-  <details class="settings-section" open>
-    <summary>חישובים (יד2 ומדלן)</summary>
-    <div class="section-content">
+  <nav class="tab-bar" role="tablist" aria-label="קטגוריות הגדרות">
+    <button
+      class="tab-button" id="tab-calculations" type="button" role="tab"
+      aria-selected="true" aria-controls="panel-calculations" tabindex="0">
+      <span class="tab-icon" aria-hidden="true">🚉</span><span>חישובים</span>
+    </button>
+    <button
+      class="tab-button" id="tab-filters" type="button" role="tab"
+      aria-selected="false" aria-controls="panel-filters" tabindex="-1">
+      <span class="tab-icon" aria-hidden="true">✨</span><span>סינון</span>
+    </button>
+    <button
+      class="tab-button" id="tab-sites" type="button" role="tab"
+      aria-selected="false" aria-controls="panel-sites" tabindex="-1">
+      <span class="tab-icon" aria-hidden="true">🌐</span><span>אתרים</span>
+    </button>
+    <button
+      class="tab-button" id="tab-amenities" type="button" role="tab"
+      aria-selected="false" aria-controls="panel-amenities" tabindex="-1">
+      <span class="tab-icon" aria-hidden="true">🏠</span><span>מאפיינים</span>
+    </button>
+    <button
+      class="tab-button" id="tab-cache" type="button" role="tab"
+      aria-selected="false" aria-controls="panel-cache" tabindex="-1">
+      <span class="tab-icon" aria-hidden="true">💾</span><span>מטמון</span>
+    </button>
+  </nav>
+
+  <main class="tab-panels">
+    <section class="tab-panel" id="panel-calculations" role="tabpanel" aria-labelledby="tab-calculations" data-panel="calculations">
+      <h2>חישובים</h2>
+      <p class="panel-intro">בחר אילו נתונים לחשב ולהציג במודעות.</p>
       <label class="row switch">
         <input type="checkbox" id="calculatePpsm">
         <span>לחשב ולהציג מחיר למ״ר</span>
@@ -47,12 +81,11 @@
         </label>
       </fieldset>
       <p class="small">כיבוי חישוב מסתיר את התג ומבטל גם את התנאי המתאים בהדגשת מודעות.</p>
-    </div>
-  </details>
+    </section>
 
-  <details class="settings-section">
-    <summary>הדגשות וסינון</summary>
-    <div class="section-content">
+    <section class="tab-panel" id="panel-filters" role="tabpanel" aria-labelledby="tab-filters" data-panel="filters" hidden>
+      <h2>הדגשות וסינון</h2>
+      <p class="panel-intro">התאם את אופן ההדגשה והסרת המודעות.</p>
       <label class="row switch">
         <input type="checkbox" id="highlight">
         <span>להדגיש מודעות שוות</span>
@@ -71,12 +104,11 @@
         <span>להסיר פרויקטים תמיד</span>
       </label>
       <p class="small">אפשר גם להסיר פרויקטים רק בעמוד הנוכחי באמצעות הכפתור בראש עמוד החיפוש.</p>
-    </div>
-  </details>
+    </section>
 
-  <details class="settings-section">
-    <summary>אתרים פעילים</summary>
-    <div class="section-content">
+    <section class="tab-panel" id="panel-sites" role="tabpanel" aria-labelledby="tab-sites" data-panel="sites" hidden>
+      <h2>אתרים פעילים</h2>
+      <p class="panel-intro">בחר באילו אתרים התוסף יפעל.</p>
       <p class="small">באתר מושבת התוסף לא יציג תגים ולא ינתח מודעות.</p>
       <label class="row switch">
         <input type="checkbox" id="disableYad2">
@@ -90,27 +122,25 @@
         <input type="checkbox" id="disableFacebook">
         <span>להשבית בפייסבוק</span>
       </label>
-    </div>
-  </details>
+    </section>
 
-  <details class="settings-section">
-    <summary>מאפיינים שחובה במודעה</summary>
-    <div class="section-content">
+    <section class="tab-panel" id="panel-amenities" role="tabpanel" aria-labelledby="tab-amenities" data-panel="amenities" hidden>
+      <h2>מאפיינים שחובה במודעה</h2>
+      <p class="panel-intro">בחר מאפיינים שחשוב לך למצוא בנכס.</p>
       <p class="small">מאפיין חסר יציג אזהרה בעמוד המודעה ולא יאפשר לסמן אותה כשווה.</p>
       <div id="requiredAmenities" class="amenities"></div>
-    </div>
-  </details>
+    </section>
 
-  <details class="settings-section">
-    <summary>מטמון בדיקות מודעות</summary>
-    <div class="section-content">
+    <section class="tab-panel" id="panel-cache" role="tabpanel" aria-labelledby="tab-cache" data-panel="cache" hidden>
+      <h2>מטמון בדיקות מודעות</h2>
+      <p class="panel-intro">ניהול המידע שנשמר מקומית במכשיר שלך.</p>
       <p class="small">המטמון נשמר מקומית ואינו מסונכרן עם ההעדפות.</p>
       <div class="cache-actions">
         <button id="clearListingCache" type="button">מחיקת מידע שמור</button>
         <span id="cacheStatus" aria-live="polite"></span>
       </div>
-    </div>
-  </details>
+    </section>
+  </main>
 
   <div class="actions">
     <button id="reset" type="button">איפוס לברירת מחדל</button>
