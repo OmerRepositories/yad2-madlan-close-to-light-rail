@@ -42,7 +42,7 @@ All enabled criteria must be met for a listing to be highlighted as worth checki
 
 ## Facebook
 
-In Facebook groups and feeds, the extension tries to identify properties offered for sale from the post text, property details, and a price or area. Posts are free-form, so classification is an estimate:
+On the main feed page of a Facebook group only (for example, `facebook.com/groups/370244223604031`), the extension tries to identify properties offered for sale from the post text, property details, and a price or area. It does not analyze the general feed, profiles, or individual post pages. Posts are free-form, so classification is an estimate:
 
 - **Price**: `2,500,000` · `2.5 מיליון` · `2.5M` · `950 אלף` · `מיליון וחצי`
 - **Area**: `95 מ"ר` · `גודל 80` · `80 מטר מרובעים`
@@ -73,7 +73,7 @@ In Facebook groups and feeds, the extension tries to identify properties offered
 
 ## Notes
 
-- Yad2 and Madlan may change their page structures. Site-specific parsers are in `yad2.js` and `madlan.js`; shared extraction helpers are in `parse.js`; Facebook post classification is isolated in `facebook-classifier.js`; Facebook UI/DOM handling is in `fb.js`; coordinate and Maps helpers are in `location.js`.
+- Yad2 and Madlan may change their page structures. Site-specific parsers are in `yad2.js` and `madlan.js`; shared extraction helpers are in `parse.js`; Facebook post classification and group-page scoping are isolated in `facebook-classifier.js` and `facebook-page.js`; Facebook UI/DOM handling is in `fb.js`; coordinate and Maps helpers are in `location.js`.
 - The median is most meaningful when the results are for a single city or neighborhood.
 - New or under-construction stations may not yet appear in OpenStreetMap.
 

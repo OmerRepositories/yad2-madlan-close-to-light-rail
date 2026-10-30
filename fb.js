@@ -1,4 +1,4 @@
-// Content script לפייסבוק (קבוצות ופיד): מזהה פוסטים של דירות ומציג מרחק לרכבת הקלה ומחיר למ"ר.
+// Facebook group feed content script: identifies property listings and displays rail distance and price per sqm.
 // הפוסטים כתובים בטקסט חופשי, ולכן הניתוח נעשה ב-parse.js (extractPriceSqmFree / parseFreeAddress).
 (() => {
   const DEFAULTS = {
@@ -14,8 +14,9 @@
   const entries = new Map(); // article -> entry
   let scanTimer = null;
   let refreshTimer = null;
-  let pageObserver = null;
+  let routeObserver = null;
   let isRunning = false;
+  let settingsLoaded = false;
   let pageBias = null;
 
   const fmtNum = (n) => Math.round(n).toLocaleString("he-IL");
@@ -386,11 +387,18 @@
     scanTimer = setTimeout(scan, 900);
   }
 
+  function syncPageState() {
+    if (!settingsLoaded) return;
+    if (CFG.disableFacebook || !LRFacebookPage.isGroupFeed(location.pathname)) {
+      stop();
+      return;
+    }
+    start();
+  }
+
   function start() {
     if (isRunning) return;
     isRunning = true;
-    pageObserver = new MutationObserver(scheduleScan);
-    pageObserver.observe(document.body, { childList: true, subtree: true });
     scan();
   }
 
@@ -401,17 +409,28 @@
     clearTimeout(refreshTimer);
     scanTimer = null;
     refreshTimer = null;
-    if (pageObserver) pageObserver.disconnect();
-    pageObserver = null;
     io.disconnect();
     for (const entry of entries.values()) entry.wrap.remove();
     entries.clear();
   }
 
   function updateSiteState() {
-    if (CFG.disableFacebook) stop();
-    else start();
+    syncPageState();
   }
+
+  function onPageMutation() {
+    if (!settingsLoaded) return;
+    const shouldRun = !CFG.disableFacebook && LRFacebookPage.isGroupFeed(location.pathname);
+    if (shouldRun !== isRunning) {
+      syncPageState();
+    } else if (isRunning) {
+      scheduleScan();
+    }
+  }
+
+  routeObserver = new MutationObserver(onPageMutation);
+  routeObserver.observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener("popstate", syncPageState);
 
   const NUM_KEYS = ["maxPpsm", "belowMedianPct", "nearM"];
   function applySettings(s) {
@@ -424,7 +443,8 @@
   try {
     chrome.storage.sync.get(DEFAULTS, (s) => {
       applySettings(s || {});
-      start();
+      settingsLoaded = true;
+      syncPageState();
     });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "sync") return;
@@ -436,6 +456,7 @@
       scheduleRefresh();
     });
   } catch {
+    settingsLoaded = true;
     updateSiteState();
   }
 })();

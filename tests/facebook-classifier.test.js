@@ -4,6 +4,7 @@ const test = require("node:test");
 globalThis.LR = require("../parse.js");
 const classifyFacebookPost = require("../facebook-classifier.js");
 assert.equal(globalThis.LR.classifyFacebookPost, classifyFacebookPost);
+const { isGroupFeed } = require("../facebook-page.js");
 
 const cases = [
   {
@@ -106,4 +107,19 @@ test("sale price and area remain extractable when the post mentions an existing 
 test("area extraction recognizes abbreviated square-meter notation", () => {
   const parsed = LR.extractPriceSqmFree("הבית 123 מ', מרפסת 50 מ'");
   assert.equal(parsed.sqm, 123);
+});
+
+test("Facebook analysis is limited to group main-feed URLs", () => {
+  for (const path of ["/groups/370244223604031", "/groups/370244223604031/"]) {
+    assert.equal(isGroupFeed(path), true, `${path} should be included`);
+  }
+  for (const path of [
+    "/",
+    "/marketplace/",
+    "/profile.php",
+    "/groups/370244223604031/posts/123456",
+    "/groups/370244223604031/permalink/123456",
+  ]) {
+    assert.equal(isGroupFeed(path), false, `${path} should be excluded`);
+  }
 });
