@@ -163,6 +163,10 @@ var LRYad2 = (() => {
     return { ...parsed, coordinates };
   }
 
+  function isProjectPage(path) {
+    return /^\/yad1\/project\/\d+\/?$/.test(path);
+  }
+
   const AMENITY_TEST_IDS = {
     parking: ["parking-item"],
     secureRoom: ["security-room-item"],
@@ -199,5 +203,5 @@ var LRYad2 = (() => {
     return result;
   }
 
-  return { listingId, readAddress, readAmenities };
+  return { listingId, readAddress, readAmenities, isProjectPage };
 })();

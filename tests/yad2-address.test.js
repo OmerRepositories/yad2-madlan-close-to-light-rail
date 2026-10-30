@@ -72,3 +72,10 @@ test("city-only geocoding queries are explicitly marked as not being an address"
     cityOnly: true,
   });
 });
+
+test("Yad2 first-hand project detail pages are recognized and excluded", () => {
+  assert.equal(context.LRYad2.isProjectPage("/yad1/project/18636"), true);
+  assert.equal(context.LRYad2.isProjectPage("/yad1/project/18636/"), true);
+  assert.equal(context.LRYad2.isProjectPage("/realestate/item/center-and-sharon/v3y00p91"), false);
+  assert.equal(context.LRYad2.isProjectPage("/yad1/project/"), false);
+});

@@ -4,6 +4,9 @@
 //  - הדגשה למודעות שוות
 // תלוי ב-parse.js (משתנה גלובלי LR).
 (() => {
+  const IS_YAD2 = location.hostname.includes("yad2.co.il");
+  if (IS_YAD2 && LRYad2.isProjectPage(location.pathname)) return;
+
   // ===== הגדרות =====
   // ברירות המחדל זהות ל-popup.js. המשתמש משנה אותן דרך חלון ההגדרות של התוסף.
   const DEFAULTS = {
