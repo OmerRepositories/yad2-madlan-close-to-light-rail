@@ -41,13 +41,15 @@ All enabled criteria must be met for a listing to be highlighted as worth checki
 
 ## Facebook
 
-In Facebook groups and feeds, posts that look like real-estate listings (real-estate terms plus a price or area) can receive the same indicators. The parser supports free-form text, including common Hebrew formats such as:
+In Facebook groups and feeds, the extension tries to identify properties offered for sale from the post text, property details, and a price or area. Posts are free-form, so classification is an estimate:
 
 - **Price**: `2,500,000` · `2.5 מיליון` · `2.5M` · `950 אלף` · `מיליון וחצי`
 - **Area**: `95 מ"ר` · `גודל 80` · `80 מטר מרובעים`
 - **Address**: a street and house number, optionally with a city, for example `הרצל 12 פתח תקווה`
-- Phone numbers are not treated as prices, and rental posts do not receive a price-per-square-meter calculation.
-- On Facebook, distance is shown only when the post includes a street address; a city alone is not specific enough.
+- Rental posts are excluded from purchase analysis. Phrases such as “for rent,” “monthly rent,” or “per month,” as well as a low currency amount typical of rent (for example `₪7,700`), produce a notice that the rental is not relevant to a purchase search.
+- “Looking for an apartment/property” posts are excluded and receive a separate notice.
+- Phone numbers are not treated as prices.
+- Facebook distance is calculated only when a street and house number are explicitly identified (for example, `רחוב צה״ל 30`). A city alone or a street without a number is not used to guess an address, to avoid misleading locations.
 - If price, area, or address is missing, the badge indicates what could not be found.
 
 ## How it works

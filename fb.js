@@ -10,10 +10,6 @@
   };
   const CFG = { ...DEFAULTS, MIN_SAMPLES: 5, ROOT_MARGIN: "600px" };
 
-  // פוסט נחשב "מודעת דירה" רק אם יש בו סימנים של נדל"ן וגם מחיר או שטח
-  const RE_PROPERTY =
-    /דירה|דירת|חדרים|חד'|פנטהאוז|דופלקס|גן|מ"ר|מ'ר|\bמר\b|למכירה|להשכרה|נכס|קוטג|בית\b/;
-
   const entries = new Map(); // article -> entry
   let scanTimer = null;
   let refreshTimer = null;
@@ -143,6 +139,28 @@
     else entry.article.insertBefore(entry.wrap, entry.article.firstChild);
   }
 
+  function showIrrelevantNotice(article, type) {
+    let entry = entries.get(article);
+    if (entry && entry.relevant) {
+      io.unobserve(article);
+      entry.wrap.remove();
+      entry = null;
+    }
+    if (!entry || !entry.notice) {
+      const notice = document.createElement("div");
+      notice.className = "lr-fb-notice";
+      const message = messageEl(article);
+      if (message) message.insertAdjacentElement("afterend", notice);
+      else article.insertBefore(notice, article.firstChild);
+      entry = { relevant: false, notice, wrap: notice };
+      entries.set(article, entry);
+    }
+    entry.notice.textContent =
+      type === "rent"
+        ? "מודעה זו היא להשכרה, ולכן אינה רלוונטית לחיפוש רכישה."
+        : "זהו פוסט חיפוש דירה/נכס, לא מודעת נכס למכירה.";
+  }
+
   function renderRail(entry, res) {
     const b = entry.rail;
     entry.res = res;
@@ -150,7 +168,15 @@
     if (!res || !res.ok) {
       const err = res && res.reason === "error";
       const tried = entry.tried.length ? "ניסינו לחפש: " + entry.tried.join(" | ") : "בפוסט לא זוהתה כתובת (רחוב ועיר).";
-      setBadge(b, "none", err ? "שגיאה בחישוב" : "לא זוהתה כתובת", "", (err && res.error ? res.error + "\n" : "") + tried);
+      setBadge(
+        b,
+        "none",
+        err ? "שגיאה בחישוב" : "לא זוהתה כתובת",
+        "",
+        (err && res.error ? res.error + "\n" : "") +
+          (res && res.message ? res.message + "\n" : "") +
+          tried
+      );
       return;
     }
     const m = res.meters;
@@ -174,9 +200,15 @@
   function startLookup(entry) {
     if (entry.started) return;
     entry.started = true;
-    const { queries } = LR.parseFreeAddress(postText(entry.article), groupContext());
-    if (!queries.length) {
-      renderRail(entry, { ok: false, reason: "not-found" });
+    const text = postText(entry.article);
+    const parsed = LR.parseFreeAddress(text, groupContext());
+    const { queries } = parsed;
+    if (!queries.length || !LR.hasExplicitFacebookAddress(text, parsed.street)) {
+      renderRail(entry, {
+        ok: false,
+        reason: "not-found",
+        message: "נדרש רחוב ומספר בית מפורשים כדי לחשב מרחק בפייסבוק.",
+      });
       scheduleRefresh();
       return;
     }
@@ -300,23 +332,30 @@
   }
 
   // ---------- סריקה ----------
-  function isPropertyPost(text) {
-    if (!text || text.length < 25) return false;
-    if (!RE_PROPERTY.test(text)) return false;
-    const p = LR.extractPriceSqmFree(text);
-    return Boolean(p.price || p.sqm);
-  }
-
   function scan() {
     scanTimer = null;
     try {
       for (const art of findPosts()) {
         let entry = entries.get(art);
+        const text = postText(art);
+        if (!text) continue;
+        const classification = LR.classifyFacebookPost(text);
+        if (classification.type === "rent" || classification.type === "seeking") {
+          showIrrelevantNotice(art, classification.type);
+          continue;
+        }
+        if (entry && !entry.relevant) {
+          if (classification.type === "listing") {
+            if (entry.notice) entry.notice.remove();
+            entries.delete(art);
+            entry = null;
+          } else {
+            continue;
+          }
+        }
         if (!entry) {
-          const text = postText(art);
-          if (!text) continue;
           // פוסט שעוד לא נטען במלואו ייבדק שוב בסריקה הבאה
-          if (!isPropertyPost(text)) {
+          if (classification.type !== "listing") {
             const tries = (art._lrTries = (art._lrTries || 0) + 1);
             if (tries > 4) entries.set(art, { relevant: false, wrap: document.createElement("i") });
             continue;

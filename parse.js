@@ -402,6 +402,58 @@ var LR = (() => {
     return { price, sqm, ppsm, reason, rent: isRent };
   }
 
+  function classifyFacebookPost(text) {
+    const source = normQuotes(text);
+    const seeking =
+      /מחפש(?:ת|ים|ות)?\s+(?:(?:.{1,35}?)\s+)?(?:דירה|דירות|נכס|נכסים|בית|בתים|לשכור|לקנות|לרכוש|שותף|שותפים)/.test(
+        source
+      );
+    if (seeking) return { type: "seeking" };
+
+    const explicitlyForSale = /למכירה|למכור|מוכר(?:ת)?\s+(?:דירה|נכס|בית)/.test(source);
+    const explicitlyForRent =
+      /להשכרה|השכרה|שכר\s*דירה|שכ"ד|שכירות|לחודש|\/\s*חודש|בחודש|דמי\s*שכירות|סאבלט/.test(
+        source
+      );
+    const lowPrice = [...source.matchAll(/(?:₪\s*([\d,]{3,})|([\d,]{3,})\s*₪)/g)]
+      .map((match) => Number((match[1] || match[2]).replace(/,/g, "")))
+      .some((price) => price >= 800 && price <= 40000);
+    if (explicitlyForRent || (lowPrice && !explicitlyForSale)) {
+      return { type: "rent" };
+    }
+
+    const property =
+      /דירה|דירת|חדרים|חד'|פנטהאוז|דופלקס|מ"ר|מ'ר|\bמר\b|למכירה|נכס|קוטג|בית\b/.test(
+        source
+      );
+    const parsed = extractPriceSqmFree(source);
+    if (property && (parsed.price || parsed.sqm)) {
+      return { type: "listing", parsed };
+    }
+    return { type: "other" };
+  }
+
+  function hasExplicitFacebookAddress(text, street) {
+    const match = String(street || "").match(/^(.*\S)\s+(\d{1,4}[א-ת]?)$/);
+    if (!match) return false;
+    const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const name = escapeRegExp(match[1]).replace(/\s+/g, "\\s+");
+    const number = escapeRegExp(match[2]);
+    const normalized = normQuotes(text);
+    const prefixed = new RegExp(
+      `(?:רחוב|רח'|שדרות|שד')\\s*:?\\s*${name}\\s+${number}(?!\\d)`
+    );
+    if (prefixed.test(normalized)) return true;
+
+    const city = findCity(normalized);
+    if (!city) return false;
+    const cityPattern = escapeRegExp(city).replace(/\s+/g, "[\\s-]+");
+    return (
+      new RegExp(`${name}\\s+${number}\\s*,?\\s*(?:ב-?)?${cityPattern}`).test(normalized) ||
+      new RegExp(`${cityPattern}\\s*[,،]\\s*${name}\\s+${number}`).test(normalized)
+    );
+  }
+
   // מחיר למ"ר שנראה לא הגיוני כנראה נובע מקריאה שגויה – לא מציגים אותו כאילו הוא אמיתי.
   const PPSM_MIN = 4000;
   const PPSM_MAX = 250000;
@@ -436,6 +488,8 @@ var LR = (() => {
     extractPriceSqm: (t) => sanity(extractPriceSqm(t)),
     parseFreeAddress,
     extractPriceSqmFree: (t) => sanity(extractPriceSqmFree(t)),
+    classifyFacebookPost,
+    hasExplicitFacebookAddress,
     findCity,
   };
 })();

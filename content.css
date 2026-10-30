@@ -158,6 +158,16 @@
 
 /* בפייסבוק: התגים יושבים בתוך הפוסט */
 .lr-fb { margin: 6px 12px; position: relative; z-index: 1; }
+.lr-fb-notice {
+  margin: 6px 12px;
+  padding: 7px 10px;
+  border: 1px solid #f1dc9a;
+  border-radius: 8px;
+  background: #fff6dd;
+  color: #765400;
+  font: 600 12px/1.4 system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  direction: rtl;
+}
 .lr-fb.lr-deal-card {
   padding: 6px;
   outline-offset: 0;
