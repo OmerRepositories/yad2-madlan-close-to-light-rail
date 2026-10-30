@@ -179,6 +179,52 @@ var LRYad2 = (() => {
     };
   }
 
+  function parseRoomCount(value) {
+    const match = String(value || "").match(/\d+(?:[.,]\d+)?/);
+    if (!match) return null;
+    const rooms = Number(match[0].replace(",", "."));
+    return Number.isFinite(rooms) ? rooms : null;
+  }
+
+  function listingExportData(root) {
+    const id = listingId(root);
+    const index = id ? getPageListingsById() : null;
+    const data = index && index.get(id);
+    const roomElement = root.querySelector('[data-testid="building-text"]');
+    const createdElement = root.querySelector('[data-testid="report-ad-label"]');
+    const structuredRooms =
+      data &&
+      (data.roomsCount ??
+        data.rooms ??
+        (data.additionalDetails && data.additionalDetails.roomsCount));
+    const createdText = createdElement ? createdElement.innerText : "";
+    const createdMatch = createdText.match(/\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/);
+    const dateValue = (keys) => {
+      if (!data) return null;
+      for (const key of keys) {
+        if (data[key] !== undefined && data[key] !== null && data[key] !== "") {
+          return data[key];
+        }
+      }
+      return null;
+    };
+
+    return {
+      rooms:
+        parseRoomCount(roomElement && roomElement.innerText) ??
+        parseRoomCount(structuredRooms),
+      listingCreatedAt:
+        (createdMatch && createdMatch[0]) ||
+        dateValue(["releaseDate", "createdAt", "publishedAt", "dateCreated"]),
+      listingUpdatedAt: dateValue([
+        "updatedAt",
+        "lastUpdatedAt",
+        "modifiedAt",
+        "updateDate",
+      ]),
+    };
+  }
+
   function readAddress(root, text, ctxCity, single) {
     const projectPage = isProjectPage(location.pathname);
     const project = projectPage ? projectFromData() : null;
@@ -305,6 +351,7 @@ var LRYad2 = (() => {
     listingId,
     listingUrl,
     readAddress,
+    listingExportData,
     projectExportData,
     readAmenities,
     isProjectPage,

@@ -34,6 +34,46 @@ var LRMadlan = (() => {
     return link ? new URL(link.href, location.href).href : null;
   }
 
+  function readListingDate(id, keys) {
+    if (!id) return null;
+    const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const idMarker = new RegExp(`["']id["']\\s*:\\s*["']${escapedId}["']`, "g");
+    for (const script of document.scripts) {
+      const source = script.textContent || "";
+      let match;
+      while ((match = idMarker.exec(source))) {
+        const start = Math.max(0, match.index - 1000);
+        const listingText = source.slice(start, Math.min(source.length, match.index + 12000));
+        for (const key of keys) {
+          const field = new RegExp(
+            `["']${key}["']\\s*:\\s*(?:"((?:\\\\.|[^"\\\\])*)"|(\\d{10,13}))`
+          );
+          const value = field.exec(listingText);
+          if (value) {
+            return value[1] !== undefined
+              ? decodeJsonString(value[1])
+              : Number(value[2]);
+          }
+        }
+        idMarker.lastIndex = match.index + match[0].length;
+      }
+      idMarker.lastIndex = 0;
+    }
+    return null;
+  }
+
+  function listingExportData(root) {
+    const roomsElement = root.querySelector('[data-auto="beds-count"]');
+    const roomsMatch = roomsElement && roomsElement.innerText.match(/\d+(?:[.,]\d+)?/);
+    const rooms = roomsMatch ? Number(roomsMatch[0].replace(",", ".")) : null;
+    const id = listingId(root);
+    return {
+      rooms: Number.isFinite(rooms) ? rooms : null,
+      listingCreatedAt: readListingDate(id, ["releaseDate", "createdAt", "publishedAt"]),
+      listingUpdatedAt: readListingDate(id, ["updatedAt", "lastUpdatedAt", "modifiedAt"]),
+    };
+  }
+
   function isProjectPage(path) {
     return (
       /^\/projects\/[^/]+\/?$/.test(path) ||
@@ -199,6 +239,7 @@ var LRMadlan = (() => {
     listingId,
     listingUrl,
     readAddress,
+    listingExportData,
     projectExportData,
     extractPriceSqm,
     readAmenities,

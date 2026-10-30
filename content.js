@@ -817,6 +817,7 @@
     const stats =
       entry.parsed ||
       (IS_YAD2 ? LR.extractPriceSqm(text) : LRMadlan.extractPriceSqm(root, text));
+    const listingMetadata = parser.listingExportData(root);
     const address = parser.readAddress(root, text, ctxCity(), entry.kind === "single");
     const listingHeading =
       root.querySelector("h1") ||
@@ -835,6 +836,15 @@
       price: Number.isFinite(stats.price) ? stats.price : previous.price,
       sqm: Number.isFinite(stats.sqm) ? stats.sqm : previous.sqm,
       pricePerSqm: Number.isFinite(stats.ppsm) ? stats.ppsm : previous.pricePerSqm,
+      rooms: Number.isFinite(listingMetadata.rooms) ? listingMetadata.rooms : previous.rooms,
+      listingCreatedAt:
+        (listingMetadata.listingCreatedAt &&
+          normalizeListingDate(listingMetadata.listingCreatedAt)) ||
+        previous.listingCreatedAt,
+      listingUpdatedAt:
+        (listingMetadata.listingUpdatedAt &&
+          normalizeListingDate(listingMetadata.listingUpdatedAt)) ||
+        previous.listingUpdatedAt,
       brokerage: hasBrokerageSignal(root),
       ...extra,
     };
@@ -845,6 +855,28 @@
     record.updatedAt = Date.now();
     listingCache[key] = record;
     saveListingCache();
+  }
+
+  function normalizeListingDate(value) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      const timestamp = value < 1e12 ? value * 1000 : value;
+      const date = new Date(timestamp);
+      return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : "";
+    }
+    const text = String(value || "").trim();
+    const localDate = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+    if (localDate) {
+      const year = localDate[3].length === 2 ? `20${localDate[3]}` : localDate[3];
+      const iso = `${year}-${localDate[2].padStart(2, "0")}-${localDate[1].padStart(2, "0")}`;
+      const date = new Date(`${iso}T00:00:00.000Z`);
+      return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === iso
+        ? iso
+        : "";
+    }
+    const isoDate = text.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoDate) return isoDate[1];
+    const timestamp = Date.parse(text);
+    return Number.isFinite(timestamp) ? new Date(timestamp).toISOString().slice(0, 10) : "";
   }
 
   function renderCachedAmenities(entry) {

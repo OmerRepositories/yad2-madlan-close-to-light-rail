@@ -80,6 +80,43 @@ test("Yad2 search cards preserve the displayed house number when structured data
   assert.ok(parsed.queries.some((query) => query.q === "מיכל לייב כץ 64, פתח תקווה"));
 });
 
+test("Yad2 listing export reads rooms and published/updated dates", () => {
+  const listingData = {
+    token: "v3y00p91",
+    address: {
+      street: { text: "ביאליק" },
+      city: { text: "פתח תקווה" },
+    },
+    updatedAt: "2026-10-20T12:00:00.000Z",
+  };
+  context.document.querySelector = (selector) =>
+    selector === 'script#__NEXT_DATA__'
+      ? {
+          textContent: JSON.stringify({
+            props: { pageProps: { listing: listingData } },
+          }),
+        }
+      : null;
+  const root = {
+    querySelector(selector) {
+      if (selector === 'a[href*="/realestate/item/"]') {
+        return { href: "https://www.yad2.co.il/realestate/item/center-and-sharon/v3y00p91" };
+      }
+      if (selector === '[data-testid="building-text"]') return { innerText: "4" };
+      if (selector === '[data-testid="report-ad-label"]') {
+        return { innerText: "פורסם ב ‏14/10/26" };
+      }
+      return null;
+    },
+  };
+
+  const metadata = context.LRYad2.listingExportData(root);
+  assert.equal(metadata.rooms, 4);
+  assert.equal(metadata.listingCreatedAt, "14/10/26");
+  assert.equal(metadata.listingUpdatedAt, "2026-10-20T12:00:00.000Z");
+  context.document.querySelector = () => null;
+});
+
 test("city-only geocoding queries are explicitly marked as not being an address", () => {
   const parsed = LR.parseAddress("", "פתח תקווה");
 
@@ -264,6 +301,46 @@ test("Madlan project detail pages are recognized", () => {
   assert.equal(address.street, "יהושע שטמפפר 81");
   assert.equal(address.city, "פתח תקווה");
   assert.ok(address.queries.some((query) => query.q === "יהושע שטמפפר 81, פתח תקווה"));
+});
+
+test("Madlan listing export reads room count and releaseDate from its listing payload", () => {
+  const script = {
+    textContent: JSON.stringify({
+      listing: {
+        id: "madlan-123",
+        releaseDate: "2026-10-14T08:30:00.000Z",
+        updatedAt: "2026-10-20T12:00:00.000Z",
+      },
+    }),
+  };
+  const madlanContext = {
+    LR,
+    document: {
+      scripts: [script],
+      querySelector: () => null,
+    },
+    URL,
+    location: {
+      pathname: "/listings/madlan-123",
+      href: "https://www.madlan.co.il/listings/madlan-123",
+    },
+  };
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "madlan.js"), "utf8"),
+    madlanContext
+  );
+  const root = {
+    querySelector(selector) {
+      return selector === '[data-auto="beds-count"]'
+        ? { innerText: "4 חדרים" }
+        : null;
+    },
+  };
+
+  const metadata = madlanContext.LRMadlan.listingExportData(root);
+  assert.equal(metadata.rooms, 4);
+  assert.equal(metadata.listingCreatedAt, "2026-10-14T08:30:00.000Z");
+  assert.equal(metadata.listingUpdatedAt, "2026-10-20T12:00:00.000Z");
 });
 
 test("Madlan project pages never geocode the full page text as an address", () => {
