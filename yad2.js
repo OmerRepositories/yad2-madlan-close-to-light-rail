@@ -73,6 +73,14 @@ var LRYad2 = (() => {
     }
   }
 
+  function listingUrl(root) {
+    if (root === document && /\/realestate\/item\//.test(location.pathname)) {
+      return location.href;
+    }
+    const link = root.querySelector('a[href*="/realestate/item/"]');
+    return link ? new URL(link.href, location.href).href : null;
+  }
+
   function placeFromData(root) {
     const id = listingId(root);
     const index = id ? getPageListingsById() : null;
@@ -203,5 +211,5 @@ var LRYad2 = (() => {
     return result;
   }
 
-  return { listingId, readAddress, readAmenities, isProjectPage };
+  return { listingId, listingUrl, readAddress, readAmenities, isProjectPage };
 })();

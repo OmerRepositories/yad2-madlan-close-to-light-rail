@@ -24,6 +24,16 @@ var LRMadlan = (() => {
     return match ? match[1] : null;
   }
 
+  function listingUrl(root) {
+    if (root === document && /\/(?:listings|bulletin)\//.test(location.pathname)) {
+      return location.href;
+    }
+    const link = root.querySelector
+      ? root.querySelector('a[data-auto="listed-bulletin-clickable"][href], a[href*="/listings/"], a[href*="/bulletin/"]')
+      : null;
+    return link ? new URL(link.href, location.href).href : null;
+  }
+
   function isProjectPage(path) {
     return /^\/projects\/[^/]+\/?$/.test(path);
   }
@@ -152,5 +162,5 @@ var LRMadlan = (() => {
     return result;
   }
 
-  return { listingId, readAddress, extractPriceSqm, readAmenities, isProjectPage };
+  return { listingId, listingUrl, readAddress, extractPriceSqm, readAmenities, isProjectPage };
 })();

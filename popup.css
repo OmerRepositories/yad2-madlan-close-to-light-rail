@@ -180,9 +180,27 @@ input[type="number"]:disabled { color: #97a2b1; background: #f1f4f8; }
 }
 .amenity-option input { width: 15px; height: 15px; margin: 0; accent-color: #dd9138; }
 
-.cache-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cache-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.cache-actions button { padding: 8px 6px; font-size: 10.5px !important; }
+.cache-actions #exportListingCache { border-color: #b7e5df; color: #087c78; background: #f0fbf8; }
+.cache-actions #exportListingCache:hover { background: #e3f7f2; }
+.cache-actions button:disabled { opacity: .58; cursor: wait; }
+.cache-status-row { display: flex; min-height: 24px; align-items: center; gap: 7px; margin-top: 9px; }
 #cacheStatus { color: #6c7d91; font-size: 10.5px; }
-#cacheStatus[data-error="true"] { color: #a12727; }
+#exportStatus { color: #16815e; font-size: 10.5px; }
+#exportStatus[data-error="true"] { color: #a12727; }
+.loading-spinner {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border: 2px solid #d5e4e9;
+  border-top-color: #138f88;
+  border-radius: 50%;
+  animation: cache-spin .7s linear infinite;
+}
+.loading-spinner[hidden] { display: none; }
+@keyframes cache-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .loading-spinner { animation-duration: 1.8s; } }
 
 .actions {
   display: flex;

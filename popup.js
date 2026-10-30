@@ -197,3 +197,43 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 updateCacheStatus();
+
+$("exportListingCache").addEventListener("click", async () => {
+  const button = $("exportListingCache");
+  const status = $("exportStatus");
+  const spinner = $("exportSpinner");
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  status.dataset.error = "false";
+  status.textContent = "טוען נתוני מטמון…";
+  spinner.hidden = false;
+
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const stored = await new Promise((resolve, reject) => {
+      chrome.storage.local.get(LISTING_CACHE_KEY, (result) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve(result && result[LISTING_CACHE_KEY] ? result[LISTING_CACHE_KEY] : {});
+      });
+    });
+    const count = Object.keys(stored).length;
+    const csv = await LRCacheExport.buildCsv(stored, (complete, total) => {
+      status.textContent = total
+        ? `מכין CSV… ${complete.toLocaleString("he-IL")} / ${total.toLocaleString("he-IL")}`
+        : "מכין קובץ CSV…";
+    });
+    LRCacheExport.downloadCsv(csv);
+    status.textContent = `הייצוא הושלם · ${count.toLocaleString("he-IL")} מודעות`;
+  } catch (error) {
+    console.error("[lightrail-ext] failed to export listing cache", error);
+    status.dataset.error = "true";
+    status.textContent = "ייצוא הנתונים נכשל";
+  } finally {
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+    spinner.hidden = true;
+  }
+});

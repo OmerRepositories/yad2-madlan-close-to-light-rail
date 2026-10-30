@@ -135,9 +135,15 @@
       <h2>מטמון בדיקות מודעות</h2>
       <p class="panel-intro">ניהול המידע שנשמר מקומית במכשיר שלך.</p>
       <p class="small">המטמון נשמר מקומית ואינו מסונכרן עם ההעדפות.</p>
+      <p class="small">הייצוא כולל דגלי מאפיינים, מיקום, קישור למודעה וכל שדה נוסף שנשמר.</p>
       <div class="cache-actions">
+        <button id="exportListingCache" type="button">ייצוא נתונים ל־CSV</button>
         <button id="clearListingCache" type="button">מחיקת מידע שמור</button>
+      </div>
+      <div class="cache-status-row">
         <span id="cacheStatus" aria-live="polite"></span>
+        <span id="exportStatus" role="status" aria-live="polite"></span>
+        <span id="exportSpinner" class="loading-spinner" aria-hidden="true" hidden></span>
       </div>
     </section>
   </main>
@@ -147,6 +153,7 @@
     <span id="status" aria-live="polite"></span>
   </div>
 
+  <script src="cache-export.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

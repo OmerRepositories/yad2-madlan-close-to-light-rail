@@ -679,7 +679,8 @@
     id,
     amenities,
     refreshTimestamp = false,
-    coordinates = null
+    coordinates = null,
+    listingUrl = null
   ) {
     const key = id ? cacheKeyForListing(id) : null;
     if (
@@ -699,12 +700,14 @@
       (!validCoordinates ||
         (existing.coordinates &&
           existing.coordinates.lat === validCoordinates.lat &&
-          existing.coordinates.lon === validCoordinates.lon))
+          existing.coordinates.lon === validCoordinates.lon)) &&
+      (!listingUrl || existing.url === listingUrl)
     ) {
       if (refreshTimestamp || Date.now() - existing.updatedAt >= 24 * 60 * 60 * 1000) {
         listingCache[key] = {
           ...existing,
           ...(validCoordinates ? { coordinates: validCoordinates } : {}),
+          ...(listingUrl ? { url: listingUrl } : {}),
           updatedAt: Date.now(),
         };
         saveListingCache();
@@ -717,6 +720,7 @@
       ...(existing && validCachedCoordinates(existing) && !validCoordinates
         ? { coordinates: existing.coordinates }
         : {}),
+      ...(listingUrl ? { url: listingUrl } : existing && existing.url ? { url: existing.url } : {}),
       updatedAt: Date.now(),
     };
     saveListingCache();
@@ -802,7 +806,8 @@
           !entry.cacheRefreshed ||
             (!validCachedCoordinates(cachedListing) &&
               LRLocation.validCoordinates(address.coordinates)),
-          address.coordinates
+          address.coordinates,
+          siteParser.listingUrl(root)
         );
         entry.cacheRefreshed = true;
       } else {
