@@ -106,12 +106,44 @@ var LRYad2 = (() => {
     };
   }
 
+  function projectFromData() {
+    const projectId = location.pathname.match(/^\/yad1\/project\/(\d+)\/?$/);
+    const data = getPageData();
+    const project =
+      data &&
+      data.props &&
+      data.props.pageProps &&
+      data.props.pageProps.grayProject;
+    if (!project || !projectId || String(project.id) !== projectId[1]) return null;
+
+    const street = project.street && project.street.name;
+    const city = project.city && project.city.name;
+    const number = project.houseNumber;
+    if (!street || !city) return null;
+    return {
+      street: number ? `${street} ${number}` : street,
+      city,
+      coordinates:
+        Number.isFinite(project.y) && Number.isFinite(project.x)
+          ? { lat: project.y, lon: project.x }
+          : null,
+    };
+  }
+
   function readAddress(root, text, ctxCity, single) {
+    const projectPage = isProjectPage(location.pathname);
+    const project = projectPage ? projectFromData() : null;
     const place = placeFromData(root);
     let parsed;
-    let coordinates = null;
+    let coordinates = project ? project.coordinates : null;
     let addressText = text;
-    if (place) {
+    if (projectPage) {
+      const addressElement = root.querySelector('[data-testid="project-address"]');
+      addressText =
+        (addressElement && addressElement.innerText) ||
+        (project ? `${project.street}, ${project.city}` : "");
+      parsed = LR.parseAddress(addressText, addressText ? ctxCity : null);
+    } else if (place) {
       addressText = `${place.street}, ${place.hood || ""}, ${place.city}`;
       parsed = LR.parseAddress(
         addressText,

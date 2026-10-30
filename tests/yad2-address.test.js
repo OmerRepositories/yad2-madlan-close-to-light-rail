@@ -87,6 +87,67 @@ test("Yad2 first-hand project detail pages are recognized", () => {
   );
 });
 
+test("Yad2 project pages use the project address and exact coordinates", () => {
+  const project = {
+    id: 18636,
+    street: { name: "יהושע שטמפפר" },
+    city: { name: "פתח תקווה" },
+    houseNumber: "81",
+    x: 34.89127731323242,
+    y: 32.09439468383789,
+  };
+  const projectAddress = { innerText: "יהושע שטמפפר 81, פתח תקווה" };
+  const projectContext = {
+    LR,
+    URL,
+    location: {
+      pathname: "/yad1/project/18636",
+      href: "https://www.yad2.co.il/yad1/project/18636",
+    },
+    document: {
+      querySelector(selector) {
+        if (selector === 'script#__NEXT_DATA__') {
+          return {
+            textContent: JSON.stringify({
+              props: { pageProps: { grayProject: project } },
+            }),
+          };
+        }
+        return null;
+      },
+    },
+  };
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "yad2.js"), "utf8"),
+    projectContext
+  );
+  const root = {
+    querySelector(selector) {
+      return selector === '[data-testid="project-address"]' ? projectAddress : null;
+    },
+  };
+
+  const parsed = projectContext.LRYad2.readAddress(
+    root,
+    "פרויקט שטמפפר 81 פתח תקווה | פרויקטים חדשים",
+    null,
+    true
+  );
+  assert.equal(parsed.street, "יהושע שטמפפר 81");
+  assert.equal(parsed.city, "פתח תקווה");
+  assert.deepEqual(parsed.queries[0], {
+    q: "יהושע שטמפפר 81, פתח תקווה",
+    approx: false,
+    bias: false,
+  });
+  assert.equal(parsed.coordinates.lat, 32.09439468383789);
+  assert.equal(parsed.coordinates.lon, 34.89127731323242);
+  assert.equal(
+    parsed.queries.some((query) => query.q.includes("פרויקטים חדשים")),
+    false
+  );
+});
+
 test("Madlan project detail pages are recognized", () => {
   const projectAddress = {
     innerText: "יהושע שטמפפר 81, פתח תקווה",
