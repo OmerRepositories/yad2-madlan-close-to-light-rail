@@ -5,7 +5,22 @@ const DEFAULTS = {
   requireRail: true,
   nearM: 800,
   highlight: true,
+  requiredAmenities: ["secureRoom"],
 };
+
+const AMENITIES = [
+  ["parking", "חניה"],
+  ["secureRoom", "ממ״ד"],
+  ["elevator", "מעלית"],
+  ["storage", "מחסן"],
+  ["airConditioner", "מיזוג אוויר"],
+  ["accessible", "נגיש לנכים"],
+  ["balcony", "מרפסת"],
+  ["sunBoiler", "דוד שמש"],
+  ["grating", "סורגים"],
+  ["garden", "גינה"],
+  ["pool", "בריכה"],
+];
 
 const $ = (id) => document.getElementById(id);
 const numberKeys = ["maxPpsm", "belowMedianPct", "nearM"];
@@ -14,6 +29,12 @@ const boolKeys = ["requireRail", "highlight"];
 function fill(s) {
   for (const k of numberKeys) $(k).value = s[k] ? s[k] : k === "nearM" ? s[k] : "";
   for (const k of boolKeys) $(k).checked = Boolean(s[k]);
+  const required = Array.isArray(s.requiredAmenities)
+    ? s.requiredAmenities
+    : DEFAULTS.requiredAmenities;
+  for (const input of document.querySelectorAll("[data-amenity]")) {
+    input.checked = required.includes(input.dataset.amenity);
+  }
   syncDisabled();
 }
 
@@ -31,6 +52,9 @@ function read() {
   if (!out.nearM) out.nearM = DEFAULTS.nearM;
   out.belowMedianPct = Math.min(out.belowMedianPct, 90);
   for (const k of boolKeys) out[k] = $(k).checked;
+  out.requiredAmenities = [...document.querySelectorAll("[data-amenity]:checked")].map(
+    (input) => input.dataset.amenity
+  );
   return out;
 }
 
@@ -57,7 +81,23 @@ for (const k of [...numberKeys, ...boolKeys]) {
   $(k).addEventListener("change", save);
 }
 
+for (const [key, label] of AMENITIES) {
+  const option = document.createElement("label");
+  option.className = "amenity-option";
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.dataset.amenity = key;
+  input.addEventListener("change", save);
+  const text = document.createElement("span");
+  text.textContent = label;
+  option.append(input, text);
+  $("requiredAmenities").appendChild(option);
+}
+
 $("reset").addEventListener("click", () => {
   fill(DEFAULTS);
-  chrome.storage.sync.set(DEFAULTS, () => flash("✓ אופס"));
+  chrome.storage.sync.set(
+    { ...DEFAULTS, requiredAmenities: [...DEFAULTS.requiredAmenities] },
+    () => flash("✓ אופס")
+  );
 });

@@ -93,5 +93,35 @@ var LRMadlan = (() => {
     return LR.extractPriceSqm(sourceText);
   }
 
-  return { readAddress, extractPriceSqm };
+  const AMENITY_KEYS = [
+    "parking",
+    "secureRoom",
+    "elevator",
+    "storage",
+    "airConditioner",
+    "accessible",
+    "balcony",
+    "sunBoiler",
+    "grating",
+    "garden",
+    "pool",
+  ];
+
+  function readAmenities(root) {
+    const checklist = root.querySelector('[data-auto="amenities-checklist-block"]');
+    if (!checklist) return null;
+    const result = {};
+    for (const key of AMENITY_KEYS) {
+      const item = checklist.querySelector(`[data-auto-checklist-amenity-item="${key}"]`);
+      if (!item) {
+        result[key] = false;
+        continue;
+      }
+      const rect = item.querySelector("svg rect");
+      result[key] = Boolean(rect && rect.getAttribute("fill") === "#018489");
+    }
+    return result;
+  }
+
+  return { readAddress, extractPriceSqm, readAmenities };
 })();

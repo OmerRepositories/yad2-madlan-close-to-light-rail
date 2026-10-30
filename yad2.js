@@ -92,5 +92,34 @@ var LRYad2 = (() => {
     return { ...parsed, coordinates: null };
   }
 
-  return { readAddress };
+  const AMENITY_TEST_IDS = {
+    parking: ["parking-item"],
+    secureRoom: ["security-room-item"],
+    elevator: ["elevator-item"],
+    storage: ["warehouse-item"],
+    airConditioner: ["air-conditioning-item"],
+    accessible: ["handicap-access-item"],
+    balcony: ["balcony-item"],
+    sunBoiler: ["boiler-item"],
+    grating: ["bars-item"],
+    garden: ["garden-item"],
+    pool: ["pool-item", "swimming-pool-item"],
+  };
+
+  function readAmenities(root) {
+    const grid = root.querySelector('[data-testid="in-property-grid"]');
+    if (!grid) return null;
+    const result = {};
+    for (const [key, testIds] of Object.entries(AMENITY_TEST_IDS)) {
+      const item = testIds.map((id) => grid.querySelector(`[data-testid="${id}"]`)).find(Boolean);
+      const disabled =
+        item &&
+        (item.classList.contains("disabled") ||
+          [...item.classList].some((className) => className.endsWith("__disabled")));
+      result[key] = Boolean(item && !disabled);
+    }
+    return result;
+  }
+
+  return { readAddress, readAmenities };
 })();

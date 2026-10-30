@@ -12,6 +12,7 @@
     requireRail: true, // לדרוש קרבה לרכבת
     nearM: 800, // מרחק מקסימלי מהרכבת במטרים
     highlight: true, // להדגיש מודעות שוות (מסגרת + תג)
+    requiredAmenities: ["secureRoom"],
   };
   const CFG = {
     ...DEFAULTS,
@@ -226,11 +227,15 @@
     const rail = mkBadge("lr-rail", "מרחק מהרכבת");
     const ppsm = mkBadge("lr-ppsm", "מחיר למ״ר");
     const deal = mkBadge("lr-dealtag", "");
+    const amenityAlert = document.createElement("div");
+    amenityAlert.className = "lr-amenity-alert";
+    amenityAlert.setAttribute("role", "alert");
+    amenityAlert.hidden = true;
     deal.hidden = true;
     deal._v.textContent = "⭐ שווה בדיקה";
     setBadge(rail, "loading", "ממתין…");
     setBadge(ppsm, "loading", "…");
-    wrap.append(rail, ppsm, deal);
+    wrap.append(amenityAlert, rail, ppsm, deal);
 
     if (kind === "single") {
       document.body.appendChild(wrap);
@@ -246,6 +251,8 @@
       rail,
       ppsm,
       deal,
+      amenityAlert,
+      amenities: null,
       getText: kind === "single" ? mainText : () => textOf(card, 3000),
       info: null,
       parsed: null,
@@ -368,6 +375,23 @@
           : LRMadlan.extractPriceSqm(entry.kind === "single" ? document : entry.card, text);
         entry.info = entry.parsed.ppsm ? entry.parsed : null;
       }
+      const root = entry.kind === "single" ? document : entry.card;
+      entry.amenities = (IS_YAD2 ? LRYad2 : LRMadlan).readAmenities(root);
+      if (entry.kind === "single") {
+        const missing = CFG.requiredAmenities
+          .filter((amenity) => entry.amenities && entry.amenities[amenity] === false)
+          .map((amenity) => AMENITY_LABELS[amenity] || amenity);
+        const unknown = CFG.requiredAmenities
+          .filter((amenity) => !entry.amenities || entry.amenities[amenity] === undefined)
+          .map((amenity) => AMENITY_LABELS[amenity] || amenity);
+        const notices = [];
+        if (missing.length) notices.push(`אין בדירה: ${missing.join(", ")}`);
+        if (unknown.length) notices.push(`לא ניתן לאמת: ${unknown.join(", ")}`);
+        entry.amenityAlert.hidden = notices.length === 0;
+        if (notices.length) {
+          entry.amenityAlert.textContent = `שים לב! ${notices.join(" · ")}`;
+        }
+      }
     }
 
     // חציון מחיר למ"ר של המודעות ברשימה
@@ -453,8 +477,15 @@
         ok = ok && pass;
         if (pass) reasons.push(`${Math.round(-entry.delta * 100)}% מתחת לחציון`);
       }
+      for (const amenity of CFG.requiredAmenities) {
+        if (!entry.amenities || entry.amenities[amenity] !== true) ok = false;
+      }
       // בלי אף תנאי פעיל לא מדגישים כלום
-      const hasRule = CFG.requireRail || CFG.maxPpsm > 0 || CFG.belowMedianPct > 0;
+      const hasRule =
+        CFG.requireRail ||
+        CFG.maxPpsm > 0 ||
+        CFG.belowMedianPct > 0 ||
+        CFG.requiredAmenities.length > 0;
       const isDeal = Boolean(CFG.highlight && hasRule && ok);
 
       deal.hidden = !isDeal;
@@ -521,10 +552,29 @@
 
   // טוענים את ההגדרות לפני שמתחילים, ומעדכנים את הדף מיד כשהמשתמש משנה הגדרה
   const NUM_KEYS = ["maxPpsm", "belowMedianPct", "nearM"];
+  const AMENITY_LABELS = {
+    parking: "חניה",
+    secureRoom: "ממ״ד",
+    elevator: "מעלית",
+    storage: "מחסן",
+    airConditioner: "מיזוג אוויר",
+    accessible: "נגיש לנכים",
+    balcony: "מרפסת",
+    sunBoiler: "דוד שמש",
+    grating: "סורגים",
+    garden: "גינה",
+    pool: "בריכה",
+  };
   function applySettings(s) {
     for (const k of Object.keys(DEFAULTS)) {
       if (!(k in s)) continue;
-      CFG[k] = NUM_KEYS.includes(k) ? Math.max(0, Number(s[k]) || 0) : Boolean(s[k]);
+      if (k === "requiredAmenities") {
+        CFG[k] = Array.isArray(s[k])
+          ? s[k].filter((amenity) => Object.prototype.hasOwnProperty.call(AMENITY_LABELS, amenity))
+          : [...DEFAULTS.requiredAmenities];
+      } else {
+        CFG[k] = NUM_KEYS.includes(k) ? Math.max(0, Number(s[k]) || 0) : Boolean(s[k]);
+      }
     }
   }
 

@@ -43,6 +43,17 @@
 .lr-badge[data-state="bad"]     { background: #fdecec; color: #a12727; border-color: #f5c2c2; }
 .lr-badge[data-state="none"]    { background: #f8f9fa; color: #6b7280; border-color: #e5e7eb; }
 
+/* אזהרת מאפיינים חסרים בעמוד מודעה */
+.lr-amenity-alert {
+  padding: 8px 10px;
+  border: 1px solid #f5c2c2;
+  border-radius: 9px;
+  background: #fdecec;
+  color: #a12727;
+  font: 700 14px/1.4 system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+.lr-amenity-alert[hidden] { display: none; }
+
 /* תג "שווה בדיקה" */
 .lr-dealtag {
   background: #f5a300;
