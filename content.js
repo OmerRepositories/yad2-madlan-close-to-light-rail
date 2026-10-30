@@ -14,6 +14,7 @@
     highlight: true, // להדגיש מודעות שוות (מסגרת + תג)
     avoidBrokerage: false,
     removeBrokerage: false,
+    removeProjects: false,
     requiredAmenities: ["secureRoom"],
   };
   const CFG = {
@@ -47,7 +48,9 @@
   let pageBias = null; // המיקום האחרון שנמצא בדיוק, לעזרה בכתובות בלי עיר
   let storedMedian = null; // חציון מחיר למ"ר מחיפוש אחרון (לדפי מודעה בודדת)
   let removeBrokerageForPage = false;
+  let removeProjectsForPage = false;
   let brokerageFilterBar = null;
+  const projectCards = new Set();
 
   const io = new IntersectionObserver(
     (list) => {
@@ -219,25 +222,92 @@
         ? "לא נמצאו מודעות תיווך"
         : "";
     brokerageFilterBar.dataset.active = String(removeBrokerageForPage || CFG.removeBrokerage);
+
+    const projectCount = [...projectCards].filter((card) =>
+      card.classList.contains("lr-project-removed")
+    ).length;
+    const projectStatus = brokerageFilterBar.querySelector(".lr-project-filter-status");
+    projectStatus.textContent = projectCount
+      ? `הוסרו ${projectCount} פרויקטים בעמוד`
+      : removeProjectsForPage || CFG.removeProjects
+        ? "לא נמצאו פרויקטים"
+        : "";
+  }
+
+  function findProjectCards() {
+    const byHref = new Map();
+    document.querySelectorAll("a[href]").forEach((anchor) => {
+      let path;
+      try {
+        path = new URL(anchor.href, location.href).pathname;
+      } catch {
+        return;
+      }
+      if (!/\/(?:yad1\/)?project\//i.test(path)) return;
+      if (!byHref.has(path)) byHref.set(path, anchor);
+    });
+
+    const cards = new Set();
+    for (const [path, anchor] of byHref) {
+      let card = anchor;
+      while (card.parentElement && card.parentElement !== document.body) {
+        const parent = card.parentElement;
+        if ((parent.textContent || "").length > 2500) break;
+        const otherProjects = [...parent.querySelectorAll("a[href]")].some((link) => {
+          try {
+            const linkPath = new URL(link.href, location.href).pathname;
+            return linkPath !== path && /\/(?:yad1\/)?project\//i.test(linkPath);
+          } catch {
+            return false;
+          }
+        });
+        if (otherProjects) break;
+        card = parent;
+      }
+      cards.add(card);
+    }
+    return cards;
+  }
+
+  function processProjectCards() {
+    for (const card of projectCards) {
+      if (!card.isConnected) projectCards.delete(card);
+    }
+    for (const card of findProjectCards()) projectCards.add(card);
+    const shouldRemove = CFG.removeProjects || removeProjectsForPage;
+    for (const card of projectCards) {
+      card.classList.toggle("lr-project-removed", shouldRemove);
+    }
+    updateBrokerageFilterStatus();
   }
 
   function createBrokerageFilterBar() {
     if (brokerageFilterBar || LISTING_HREF.test(location.pathname)) return;
     brokerageFilterBar = document.createElement("div");
     brokerageFilterBar.id = "lr-brokerage-filter";
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = "הסר מודעות תיווך בעמוד זה";
-    button.addEventListener("click", () => {
+    const brokerageButton = document.createElement("button");
+    brokerageButton.type = "button";
+    brokerageButton.textContent = "הסר מודעות תיווך בעמוד זה";
+    brokerageButton.addEventListener("click", () => {
       removeBrokerageForPage = true;
       findCards().forEach(processCard);
       for (const entry of entries.values()) filterBrokerageEntry(entry);
       updateBrokerageFilterStatus();
     });
-    const status = document.createElement("span");
-    status.className = "lr-brokerage-filter-status";
-    status.setAttribute("aria-live", "polite");
-    brokerageFilterBar.append(button, status);
+    const brokerageStatus = document.createElement("span");
+    brokerageStatus.className = "lr-brokerage-filter-status";
+    brokerageStatus.setAttribute("aria-live", "polite");
+    const projectButton = document.createElement("button");
+    projectButton.type = "button";
+    projectButton.textContent = "הסר פרויקטים בעמוד זה";
+    projectButton.addEventListener("click", () => {
+      removeProjectsForPage = true;
+      processProjectCards();
+    });
+    const projectStatus = document.createElement("span");
+    projectStatus.className = "lr-project-filter-status";
+    projectStatus.setAttribute("aria-live", "polite");
+    brokerageFilterBar.append(brokerageButton, brokerageStatus, projectButton, projectStatus);
     document.body.prepend(brokerageFilterBar);
   }
 
@@ -759,6 +829,7 @@
     try {
       ensureMain();
       findCards().forEach(processCard);
+      processProjectCards();
       scheduleRefresh();
     } catch (e) {
       console.warn("[lightrail-ext] scan failed", e);
@@ -845,6 +916,7 @@
       const next = {};
       for (const [k, v] of Object.entries(changes)) next[k] = v.newValue;
       applySettings(next);
+      processProjectCards();
       scheduleRefresh();
     });
   } catch {

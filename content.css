@@ -72,7 +72,8 @@
 .lr-cache-note[hidden] { display: none; }
 .lr-cache-missing { outline: 2px solid #d64545 !important; }
 
-.lr-brokerage-removed { display: none !important; }
+.lr-brokerage-removed,
+.lr-project-removed { display: none !important; }
 
 #lr-brokerage-filter {
   position: sticky;

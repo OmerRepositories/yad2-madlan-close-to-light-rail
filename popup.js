@@ -7,6 +7,7 @@ const DEFAULTS = {
   highlight: true,
   avoidBrokerage: false,
   removeBrokerage: false,
+  removeProjects: false,
   requiredAmenities: ["secureRoom"],
 };
 
@@ -28,7 +29,7 @@ const $ = (id) => document.getElementById(id);
 const LISTING_CACHE_KEY = "yad2AmenityCache_v1";
 const LISTING_CACHE_TTL_MS = 60 * 24 * 60 * 60 * 1000;
 const numberKeys = ["maxPpsm", "belowMedianPct", "nearM"];
-const boolKeys = ["requireRail", "highlight", "avoidBrokerage", "removeBrokerage"];
+const boolKeys = ["requireRail", "highlight", "avoidBrokerage", "removeBrokerage", "removeProjects"];
 
 function fill(s) {
   for (const k of numberKeys) $(k).value = s[k] ? s[k] : k === "nearM" ? s[k] : "";
