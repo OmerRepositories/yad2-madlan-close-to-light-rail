@@ -111,6 +111,10 @@
     return null;
   }
 
+  function validCachedCoordinates(record) {
+    return Boolean(record && LRLocation.validCoordinates(record.coordinates));
+  }
+
   // ---------- קריאת טקסט ----------
   // innerText לא מפריד בין אלמנטים שאין ביניהם שבירת שורה, ולכן "קומה 7" ו-"95 מ״ר" נקראו
   // כ-"קומה 795 מ״ר". כאן כל צומת טקסט נקרא בנפרד, כל אחד בשורה משלו,
@@ -512,6 +516,12 @@
   // ---------- חישוב רכבת (רק למודעות שנראות / קרובות למסך) ----------
   function startLookup(entry) {
     if (entry.started) return;
+    if (!listingCacheLoaded) {
+      setTimeout(() => {
+        if (entry.card.isConnected) startLookup(entry);
+      }, 100);
+      return;
+    }
     entry.started = true;
     const maxTries = entry.kind === "single" ? 5 : 3;
 
@@ -520,6 +530,7 @@
       const root = entry.kind === "single" ? document : entry.card;
       const siteParser = IS_YAD2 ? LRYad2 : LRMadlan;
       const parsed = siteParser.readAddress(root, text, ctxCity(), entry.kind === "single");
+      entry.listingId = siteParser.listingId(root);
       const { queries } = parsed;
       if (!queries.length && !LRLocation.validCoordinates(parsed.coordinates)) {
         // ייתכן שהכרטיס עוד לא נטען במלואו – מנסים שוב כמה פעמים
@@ -531,9 +542,14 @@
       entry.tried = queries.map((q) => q.q);
       setBadge(entry.rail, "loading", "מחשב…");
       try {
+        const cachedListing = entry.listingId
+          ? listingCache[cacheKeyForListing(entry.listingId)]
+          : null;
         const coordinates = LRLocation.validCoordinates(parsed.coordinates)
           ? parsed.coordinates
-          : null;
+          : validCachedCoordinates(cachedListing)
+            ? cachedListing.coordinates
+            : null;
         chrome.runtime.sendMessage({ type: "lookup", queries, bias: pageBias, coordinates }, (res) => {
           if (chrome.runtime.lastError) {
             renderRail(entry, { ok: false, reason: "error", error: chrome.runtime.lastError.message });
@@ -597,7 +613,12 @@
     }, 500);
   }
 
-  function rememberListingAmenities(id, amenities, refreshTimestamp = false) {
+  function rememberListingAmenities(
+    id,
+    amenities,
+    refreshTimestamp = false,
+    coordinates = null
+  ) {
     const key = id ? cacheKeyForListing(id) : null;
     if (
       !id ||
@@ -608,18 +629,34 @@
       return;
     }
     const existing = listingCache[key];
+    const validCoordinates = LRLocation.validCoordinates(coordinates) ? coordinates : null;
     if (
       existing &&
       Object.keys(amenities).every((amenity) => existing.amenities[amenity] === amenities[amenity]) &&
-      Object.keys(existing.amenities).length === Object.keys(amenities).length
+      Object.keys(existing.amenities).length === Object.keys(amenities).length &&
+      (!validCoordinates ||
+        (existing.coordinates &&
+          existing.coordinates.lat === validCoordinates.lat &&
+          existing.coordinates.lon === validCoordinates.lon))
     ) {
       if (refreshTimestamp || Date.now() - existing.updatedAt >= 24 * 60 * 60 * 1000) {
-        listingCache[key] = { ...existing, updatedAt: Date.now() };
+        listingCache[key] = {
+          ...existing,
+          ...(validCoordinates ? { coordinates: validCoordinates } : {}),
+          updatedAt: Date.now(),
+        };
         saveListingCache();
       }
       return;
     }
-    listingCache[key] = { amenities, updatedAt: Date.now() };
+    listingCache[key] = {
+      amenities,
+      ...(validCoordinates ? { coordinates: validCoordinates } : {}),
+      ...(existing && validCachedCoordinates(existing) && !validCoordinates
+        ? { coordinates: existing.coordinates }
+        : {}),
+      updatedAt: Date.now(),
+    };
     saveListingCache();
   }
 
@@ -670,11 +707,28 @@
         entry.info = entry.parsed.ppsm ? entry.parsed : null;
       }
       const root = entry.kind === "single" ? document : entry.card;
-      entry.listingId = (IS_YAD2 ? LRYad2 : LRMadlan).listingId(root);
+      const siteParser = IS_YAD2 ? LRYad2 : LRMadlan;
+      entry.listingId = siteParser.listingId(root);
       const currentAmenities = (IS_YAD2 ? LRYad2 : LRMadlan).readAmenities(root);
       if (entry.kind === "single" && currentAmenities) {
         entry.amenities = currentAmenities;
-        rememberListingAmenities(entry.listingId, currentAmenities, !entry.cacheRefreshed);
+        const address = siteParser.readAddress(
+          root,
+          entry.getText(),
+          ctxCity(),
+          true
+        );
+        const cachedListing = entry.listingId
+          ? listingCache[cacheKeyForListing(entry.listingId)]
+          : null;
+        rememberListingAmenities(
+          entry.listingId,
+          currentAmenities,
+          !entry.cacheRefreshed ||
+            (!validCachedCoordinates(cachedListing) &&
+              LRLocation.validCoordinates(address.coordinates)),
+          address.coordinates
+        );
         entry.cacheRefreshed = true;
       } else {
         const cached = entry.listingId ? listingCache[cacheKeyForListing(entry.listingId)] : null;
@@ -898,6 +952,8 @@
       if (m && Date.now() - m.at < 14 * 24 * 3600 * 1000) storedMedian = m;
       if (chrome.runtime.lastError) {
         console.warn("[lightrail-ext] failed to load listing cache", chrome.runtime.lastError.message);
+        listingCacheLoaded = true;
+        scheduleRefresh();
       } else {
         const storedCache = (r && r[LISTING_CACHE_KEY]) || {};
         listingCache = trimListingCache({ ...storedCache, ...listingCache });
@@ -936,6 +992,7 @@
       scheduleRefresh();
     });
   } catch {
+    listingCacheLoaded = true;
     start(); // אם האחסון לא זמין, ממשיכים עם ברירות המחדל
   }
 })();

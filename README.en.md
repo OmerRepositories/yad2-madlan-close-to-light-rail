@@ -54,6 +54,7 @@ In Facebook groups and feeds, posts that look like real-estate listings (real-es
 
 - **Addresses**: Yad2 and Madlan are parsed using known site structures and listing data first. If those are unavailable, the extension falls back to general text parsing. The search context can supply a missing city.
 - **Yad2 amenities**: the parking count in “More details” is also considered; a count greater than zero confirms parking even if the parking icon is disabled.
+- **Yad2 location**: exact coordinates read on a listing page are cached with its amenity check and reused on search cards for that listing, avoiding street-level geocoding estimates.
 - **Price per square meter**: price divided by area, compared with the median of listings on the page. A listing page uses the last saved search median when available.
 - **Stations**: sourced from OpenStreetMap (Overpass) and cached for one week.
 - **Lazy processing**: listing calculations start as cards approach the viewport.
