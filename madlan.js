@@ -97,10 +97,13 @@ var LRMadlan = (() => {
 
   function readAddress(root, text, ctxCity, single) {
     const data = listingData(root);
-    const addressElement = root.querySelector(
-      '[data-auto="primary_address_text"], [data-testid="address"], [data-testid="project-address"]'
-    );
-    const addressText = addressElement ? addressElement.innerText : text;
+    const projectPage = isProjectPage(location.pathname);
+    const addressElement = projectPage
+      ? root.querySelector('[data-testid="project-address"]')
+      : root.querySelector(
+          '[data-auto="primary_address_text"], [data-testid="address"]'
+        );
+    const addressText = addressElement ? addressElement.innerText : projectPage ? "" : text;
     const parsed = single
       ? LR.parseAny(addressText, ctxCity)
       : LR.parseAddress(addressText, ctxCity);

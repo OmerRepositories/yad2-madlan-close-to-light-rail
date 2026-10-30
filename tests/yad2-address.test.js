@@ -96,7 +96,7 @@ test("Madlan project detail pages are recognized", () => {
     document: {
       scripts: [],
       querySelector(selector) {
-        return selector.includes('[data-testid="project-address"]')
+        return selector === '[data-testid="project-address"]'
           ? projectAddress
           : null;
       },
@@ -131,4 +131,31 @@ test("Madlan project detail pages are recognized", () => {
   assert.equal(address.street, "יהושע שטמפפר 81");
   assert.equal(address.city, "פתח תקווה");
   assert.ok(address.queries.some((query) => query.q === "יהושע שטמפפר 81, פתח תקווה"));
+});
+
+test("Madlan project pages never geocode the full page text as an address", () => {
+  const madlanContext = {
+    LR,
+    document: {
+      scripts: [],
+      querySelector: () => null,
+    },
+    URL,
+    location: {
+      pathname: "/projects/example_project",
+      href: "https://www.madlan.co.il/projects/example_project",
+    },
+  };
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "madlan.js"), "utf8"),
+    madlanContext
+  );
+
+  const address = madlanContext.LRMadlan.readAddress(
+    madlanContext.document,
+    "פרויקטים חדשים יהודה | פרויקט שטמפפר 81 פתח תקווה ועוד טקסטים",
+    null,
+    true
+  );
+  assert.deepEqual(address.queries, []);
 });
