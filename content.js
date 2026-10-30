@@ -28,6 +28,8 @@
   const LISTING_CACHE_MAX_ITEMS = 2500;
   const IS_YAD2 = location.hostname.includes("yad2.co.il");
   let listingCache = {};
+  let listingCacheLoaded = false;
+  let pendingCacheSave = false;
   let cacheSaveTimer = null;
   const cacheWriteSuppressedIds = new Set();
 
@@ -450,6 +452,7 @@
       amenityAlert,
       cacheNote,
       brokerageRemoved: false,
+      cacheRefreshed: false,
       amenities: null,
       listingId: null,
       getText: kind === "single" ? mainText : () => textOf(card, 3000),
@@ -579,6 +582,12 @@
   function saveListingCache() {
     clearTimeout(cacheSaveTimer);
     cacheSaveTimer = setTimeout(() => {
+      cacheSaveTimer = null;
+      if (!listingCacheLoaded) {
+        pendingCacheSave = true;
+        return;
+      }
+      pendingCacheSave = false;
       listingCache = trimListingCache(listingCache);
       chrome.storage.local.set({ [LISTING_CACHE_KEY]: listingCache }, () => {
         if (chrome.runtime.lastError) {
@@ -588,7 +597,7 @@
     }, 500);
   }
 
-  function rememberListingAmenities(id, amenities) {
+  function rememberListingAmenities(id, amenities, refreshTimestamp = false) {
     const key = id ? cacheKeyForListing(id) : null;
     if (
       !id ||
@@ -604,7 +613,7 @@
       Object.keys(amenities).every((amenity) => existing.amenities[amenity] === amenities[amenity]) &&
       Object.keys(existing.amenities).length === Object.keys(amenities).length
     ) {
-      if (Date.now() - existing.updatedAt >= 24 * 60 * 60 * 1000) {
+      if (refreshTimestamp || Date.now() - existing.updatedAt >= 24 * 60 * 60 * 1000) {
         listingCache[key] = { ...existing, updatedAt: Date.now() };
         saveListingCache();
       }
@@ -665,7 +674,8 @@
       const currentAmenities = (IS_YAD2 ? LRYad2 : LRMadlan).readAmenities(root);
       if (entry.kind === "single" && currentAmenities) {
         entry.amenities = currentAmenities;
-        rememberListingAmenities(entry.listingId, currentAmenities);
+        rememberListingAmenities(entry.listingId, currentAmenities, !entry.cacheRefreshed);
+        entry.cacheRefreshed = true;
       } else {
         const cached = entry.listingId ? listingCache[cacheKeyForListing(entry.listingId)] : null;
         entry.amenities = validCachedAmenities(cached) ? cached.amenities : currentAmenities;
@@ -890,10 +900,12 @@
         console.warn("[lightrail-ext] failed to load listing cache", chrome.runtime.lastError.message);
       } else {
         const storedCache = (r && r[LISTING_CACHE_KEY]) || {};
-        listingCache = trimListingCache(storedCache);
+        listingCache = trimListingCache({ ...storedCache, ...listingCache });
+        listingCacheLoaded = true;
         if (Object.keys(listingCache).length !== Object.keys(storedCache).length) {
           saveListingCache();
         }
+        if (pendingCacheSave) saveListingCache();
         scheduleRefresh();
       }
     });

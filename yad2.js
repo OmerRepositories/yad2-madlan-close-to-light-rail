@@ -143,6 +143,13 @@ var LRYad2 = (() => {
           [...item.classList].some((className) => className.endsWith("__disabled")));
       result[key] = Boolean(item && !disabled);
     }
+
+    const parkingValue = root.querySelector('[data-testid="parking-value"]');
+    const parkingCount = parkingValue && parkingValue.textContent.match(/^\s*(\d+)/);
+    if (parkingCount && Number(parkingCount[1]) > 0) {
+      result.parking = true;
+    }
+
     return result;
   }
 

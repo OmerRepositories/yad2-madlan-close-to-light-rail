@@ -35,7 +35,7 @@ Click the extension icon in Chrome's toolbar. Settings are saved automatically a
 - **Always remove brokerage listings** — automatically hides listings detected as brokerage. Alternatively, use the button at the top of a search page to hide them only for the current page; this temporary filter is not retained after a refresh.
 - **Always remove projects** — hides project cards, including Yad2 `/yad1/project/` links and Madlan `/projects/` links. The button at the top of a search page can apply this only to the current page.
 - **Required listing amenities** — choose parking, secure room (Mamad), elevator, storage, air conditioning, accessibility, balcony, solar water heater, bars, garden, and pool. Missing amenities are shown as an alert on a listing page and prevent the listing from being marked as worth checking. Unknown amenities are reported as unverifiable. Mamad is selected by default.
-- **Listing-check cache for Yad2 and Madlan** — after opening a listing, its ID and amenity status are stored locally for up to 60 days. Site-specific ID prefixes are used, and temporary URL parameters are ignored. When the listing appears in search results again, the cache shows missing required amenities or confirms that they were found. Up to 2,500 listings are retained; old records are removed automatically. **Clear saved data** removes only the listing cache, not user settings.
+- **Listing-check cache for Yad2 and Madlan** — every visit to a listing page refreshes its local cached amenity data, even if a record already exists. Site-specific ID prefixes are used, and temporary URL parameters are ignored. When the listing appears in search results again, the cache shows missing required amenities or confirms that they were found. Up to 2,500 listings are retained; old records are removed automatically. **Clear saved data** removes only the listing cache, not user settings.
 
 All enabled criteria must be met for a listing to be highlighted as worth checking.
 
@@ -53,6 +53,7 @@ In Facebook groups and feeds, posts that look like real-estate listings (real-es
 ## How it works
 
 - **Addresses**: Yad2 and Madlan are parsed using known site structures and listing data first. If those are unavailable, the extension falls back to general text parsing. The search context can supply a missing city.
+- **Yad2 amenities**: the parking count in “More details” is also considered; a count greater than zero confirms parking even if the parking icon is disabled.
 - **Price per square meter**: price divided by area, compared with the median of listings on the page. A listing page uses the last saved search median when available.
 - **Stations**: sourced from OpenStreetMap (Overpass) and cached for one week.
 - **Lazy processing**: listing calculations start as cards approach the viewport.
