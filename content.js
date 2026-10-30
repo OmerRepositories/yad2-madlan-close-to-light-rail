@@ -234,6 +234,10 @@
         : "";
   }
 
+  function isProjectPath(path) {
+    return /\/(?:yad1\/project|projects?)\//i.test(path);
+  }
+
   function findProjectCards() {
     const byHref = new Map();
     document.querySelectorAll("a[href]").forEach((anchor) => {
@@ -243,7 +247,7 @@
       } catch {
         return;
       }
-      if (!/\/(?:yad1\/)?project\//i.test(path)) return;
+      if (!isProjectPath(path)) return;
       if (!byHref.has(path)) byHref.set(path, anchor);
     });
 
@@ -256,7 +260,7 @@
         const otherProjects = [...parent.querySelectorAll("a[href]")].some((link) => {
           try {
             const linkPath = new URL(link.href, location.href).pathname;
-            return linkPath !== path && /\/(?:yad1\/)?project\//i.test(linkPath);
+            return linkPath !== path && isProjectPath(linkPath);
           } catch {
             return false;
           }
