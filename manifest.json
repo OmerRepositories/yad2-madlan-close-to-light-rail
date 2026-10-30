@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "קרבה לרכבת הקלה – יד2 ומדלן",
-  "description": "מציג על כל מודעת נדל\"ן ביד2 ובמדלן את המרחק לתחנת הרכבת הקלה הקרובה.",
-  "version": "1.3.0",
+  "description": "מציג על מודעות נדל\"ן ביד2, מדלן ופייסבוק את המרחק לרכבת הקלה ואת המחיר למ\"ר.",
+  "version": "1.4.0",
   "permissions": ["storage"],
   "action": {
     "default_title": "הגדרות – קרבה לרכבת הקלה",
@@ -23,6 +23,16 @@
         "https://www.madlan.co.il/*"
       ],
       "js": ["parse.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.facebook.com/*",
+        "https://web.facebook.com/*",
+        "https://m.facebook.com/*"
+      ],
+      "js": ["parse.js", "fb.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
     }

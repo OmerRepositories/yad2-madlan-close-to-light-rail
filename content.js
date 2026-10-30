@@ -95,14 +95,48 @@
     return null;
   }
 
+  // ---------- קריאת טקסט ----------
+  // innerText לא מפריד בין אלמנטים שאין ביניהם שבירת שורה, ולכן "קומה 7" ו-"95 מ״ר" נקראו
+  // כ-"קומה 795 מ״ר". כאן כל צומת טקסט נקרא בנפרד, כל אחד בשורה משלו,
+  // והתגים של התוסף עצמו (.lr-wrap) לא נכללים.
+  function textOf(root, limit = 8000) {
+    if (!root) return "";
+    const out = [];
+    let len = 0;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(n) {
+        const p = n.parentElement;
+        if (!p || p.closest(".lr-wrap")) return NodeFilter.FILTER_REJECT;
+        const tag = p.tagName;
+        if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") return NodeFilter.FILTER_REJECT;
+        return n.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+    while (walker.nextNode()) {
+      const v = walker.currentNode.nodeValue.replace(/\s+/g, " ").trim();
+      out.push(v);
+      len += v.length;
+      if (len > limit) break;
+    }
+    return out.join("\n");
+  }
+
   // ---------- טקסט של מודעה בודדת ----------
   function mainText() {
     const h1 = document.querySelector("h1");
+    const meta = (n) => {
+      const el = document.querySelector(`meta[property="${n}"], meta[name="${n}"]`);
+      return el ? el.getAttribute("content") || "" : "";
+    };
     const root = document.querySelector("main") || document.body;
-    let text = (h1 ? h1.innerText + "\n" : "") + (root.innerText || "");
-    const idx = text.slice(200).search(SIMILAR_MARKERS);
-    if (idx >= 0) text = text.slice(0, 200 + idx);
-    return text.slice(0, 6000);
+    let body = textOf(root, 12000);
+    const idx = body.slice(200).search(SIMILAR_MARKERS);
+    if (idx >= 0) body = body.slice(0, 200 + idx);
+    // כותרת, תיאור ו-meta נותנים לעיתים קרובות כתובת מלאה כולל עיר
+    const head = [h1 ? textOf(h1) : "", document.title, meta("og:title"), meta("og:description")]
+      .filter(Boolean)
+      .join("\n");
+    return (head + "\n" + body).slice(0, 8000);
   }
 
   // ---------- זיהוי כרטיסים ----------
@@ -212,7 +246,7 @@
       rail,
       ppsm,
       deal,
-      getText: kind === "single" ? mainText : () => card.innerText || "",
+      getText: kind === "single" ? mainText : () => textOf(card, 3000),
       info: null,
       parsed: null,
       res: null,
@@ -271,7 +305,9 @@
     const maxTries = entry.kind === "single" ? 5 : 3;
 
     const attempt = () => {
-      const { queries } = LR.parseAddress(entry.getText(), ctxCity());
+      const text = entry.getText();
+      // בכרטיס רשימה הפורמט קבוע (מובנה), בדף מודעה בודדת צריך גם ניתוח חופשי
+      const { queries } = entry.kind === "single" ? LR.parseAny(text, ctxCity()) : LR.parseAddress(text, ctxCity());
       if (!queries.length) {
         // ייתכן שהכרטיס עוד לא נטען במלואו – מנסים שוב כמה פעמים
         if (++entry.tries < maxTries) return setTimeout(attempt, 1000);

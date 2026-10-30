@@ -77,3 +77,12 @@
 }
 .lr-float .lr-badge { border-radius: 10px; flex-wrap: wrap; }
 .lr-float.lr-deal-card { padding: 10px; }
+
+/* בפייסבוק: התגים יושבים בתוך הפוסט */
+.lr-fb { margin: 6px 12px; position: relative; z-index: 1; }
+.lr-fb.lr-deal-card {
+  padding: 6px;
+  outline-offset: 0;
+  border-radius: 12px;
+  background: rgba(245, 163, 0, 0.08);
+}
