@@ -476,6 +476,17 @@
     rail.hidden = !CFG.calculateRail;
     ppsm.hidden = !CFG.calculatePpsm;
     const deal = mkBadge("lr-dealtag", "");
+    const copyButton = document.createElement("button");
+    copyButton.className = "lr-copy-button";
+    copyButton.type = "button";
+    copyButton.textContent = "📋";
+    copyButton.setAttribute("aria-label", "העתקת פרטי המודעה לוואטסאפ");
+    const copyTooltip = document.createElement("span");
+    copyTooltip.className = "lr-copy-tooltip";
+    copyTooltip.hidden = true;
+    copyTooltip.setAttribute("role", "tooltip");
+    copyButton.setAttribute("aria-describedby", `lr-copy-tooltip-${entries.size}`);
+    copyTooltip.id = `lr-copy-tooltip-${entries.size}`;
     const amenityAlert = document.createElement("div");
     const cacheNote = document.createElement("div");
     amenityAlert.className = "lr-amenity-alert";
@@ -487,7 +498,16 @@
     deal._v.textContent = "⭐ שווה בדיקה";
     setBadge(rail, "loading", "ממתין…");
     setBadge(ppsm, "loading", "…");
-    wrap.append(amenityAlert, cacheNote, rail, addressNote, ppsm, deal);
+    wrap.append(
+      amenityAlert,
+      cacheNote,
+      rail,
+      addressNote,
+      ppsm,
+      deal,
+      copyButton,
+      copyTooltip
+    );
 
     if (kind === "single") {
       document.body.appendChild(wrap);
@@ -496,13 +516,15 @@
       card.appendChild(wrap);
     }
 
-    return {
+    const entry = {
       kind,
       card,
       wrap,
       rail,
       ppsm,
       deal,
+      copyButton,
+      copyTooltip,
       amenityAlert,
       cacheNote,
       brokerageRemoved: false,
@@ -520,6 +542,157 @@
       lastTry: 0,
       delta: null,
     };
+    copyButton.addEventListener("pointerenter", () =>
+      showCopyTooltip(copyButton, copyTooltip, entry)
+    );
+    copyButton.addEventListener("focus", () =>
+      showCopyTooltip(copyButton, copyTooltip, entry)
+    );
+    copyButton.addEventListener("pointerleave", () => {
+      copyTooltip.hidden = true;
+    });
+    copyButton.addEventListener("blur", () => {
+      copyTooltip.hidden = true;
+    });
+    copyButton.addEventListener(
+      "click",
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        copyListingMessage(entry, copyButton, copyTooltip);
+      },
+      true
+    );
+    return entry;
+  }
+
+  function formatCopyData(entry) {
+    const parser = IS_YAD2 ? LRYad2 : LRMadlan;
+    const root = entry.kind === "single" ? document : entry.card;
+    const text = entry.getText();
+    const address = parser.readAddress(root, text, ctxCity(), entry.kind === "single");
+    const parts = [address.street, address.city].filter(Boolean);
+    const stats =
+      entry.parsed ||
+      (IS_YAD2
+        ? LR.extractPriceSqm(text)
+        : LRMadlan.extractPriceSqm(root, text));
+    const metadata = parser.listingExportData(root);
+    const floor = readListingFloor(root);
+    const railDistance =
+      entry.res && entry.res.ok
+        ? `${entry.res.approx ? "כ-" : ""}${fmtDistance(entry.res.meters)}${
+            entry.res.approx ? " (משוער)" : " (מדויק)"
+          }`
+        : null;
+    return {
+      address: parts.join(", "),
+      price: Number.isFinite(stats.price) ? `₪${fmtNum(stats.price)}` : null,
+      sqm: Number.isFinite(stats.sqm) ? stats.sqm : null,
+      rooms: Number.isFinite(metadata.rooms) ? metadata.rooms : null,
+      floor,
+      pricePerSqm: Number.isFinite(stats.ppsm) ? `₪${fmtNum(stats.ppsm)}` : null,
+      railDistance,
+    };
+  }
+
+  function readListingFloor(root) {
+    const selectors = IS_YAD2
+      ? [
+          '[data-testid="floor"]',
+          '[data-testid="floor-text"]',
+          '[data-testid="property-floor"]',
+          '[data-auto="floor"]',
+        ]
+      : root === document
+        ? [
+            '[data-auto="floor"]',
+            '[data-testid="floor"]',
+            '[data-auto="property-floor"]',
+          ]
+        : [
+            '[data-auto="property-floor"]',
+            '[data-auto="floor"]',
+            '[data-testid="floor"]',
+          ];
+    for (const selector of selectors) {
+      const element = root.querySelector(selector);
+      const text = element && String(element.innerText || element.textContent || "").trim();
+      const floor = LRWhatsAppMessage.normalizeFloor(
+        text,
+        Boolean(element && /floor/i.test(selector))
+      );
+      if (floor) return floor;
+    }
+
+    const floorDetail = [...root.querySelectorAll('[data-testid="building-text"]')].find(
+      (element) => /קומה/.test(element.parentElement?.innerText || "")
+    );
+    if (floorDetail) {
+      const floor = LRWhatsAppMessage.normalizeFloor(floorDetail.parentElement.innerText);
+      if (floor) return floor;
+    }
+
+    const cardFloor = !IS_YAD2 && root.querySelector('[data-auto="property-floor"]');
+    const cardText =
+      cardFloor && String(cardFloor.innerText || cardFloor.textContent || "").trim();
+    return LRWhatsAppMessage.normalizeFloor(cardText, Boolean(cardFloor));
+  }
+
+  function showCopyTooltip(button, tooltip, entry) {
+    tooltip.textContent = LRWhatsAppMessage.format(formatCopyData(entry));
+    tooltip.hidden = false;
+    const rect = button.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const left = Math.min(
+      Math.max(8, rect.left),
+      window.innerWidth - tooltipRect.width - 8
+    );
+    const top =
+      rect.top >= tooltipRect.height + 8
+        ? rect.top - tooltipRect.height - 8
+        : rect.bottom + 8;
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${Math.max(8, Math.min(top, window.innerHeight - tooltipRect.height - 8))}px`;
+  }
+
+  async function copyListingMessage(entry, button, tooltip) {
+    const message = LRWhatsAppMessage.format(formatCopyData(entry));
+    try {
+      await navigator.clipboard.writeText(message);
+    } catch (clipboardError) {
+      let copied = false;
+      let textarea = null;
+      try {
+        textarea = document.createElement("textarea");
+        textarea.value = message;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        copied = document.execCommand("copy");
+      } catch (fallbackError) {
+        console.warn("[lightrail-ext] clipboard fallback failed", fallbackError);
+      } finally {
+        if (textarea && textarea.isConnected) textarea.remove();
+      }
+      if (!copied) {
+        console.warn("[lightrail-ext] could not copy WhatsApp listing message", clipboardError);
+        tooltip.textContent = "לא ניתן להעתיק ללוח. בדוק הרשאות clipboard של התוסף.";
+        tooltip.hidden = false;
+        return;
+      }
+    }
+    button.textContent = "✓";
+    tooltip.textContent = "ההודעה הועתקה ללוח";
+    tooltip.hidden = false;
+    setTimeout(() => {
+      button.textContent = "📋";
+      if (!button.matches(":hover") && document.activeElement !== button) {
+        tooltip.hidden = true;
+      }
+    }, 1600);
   }
 
   function renderRail(entry, res) {

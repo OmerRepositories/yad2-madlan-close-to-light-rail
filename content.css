@@ -42,6 +42,44 @@
 .lr-address-note[hidden] { display: none; }
 .lr-label[hidden], .lr-sub[hidden] { display: none; }
 
+.lr-copy-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #b7e4c7 !important;
+  border-radius: 50% !important;
+  background: #e6f7ec !important;
+  color: #11722f !important;
+  font: 16px/1 system-ui, sans-serif !important;
+  cursor: pointer !important;
+}
+.lr-copy-button:hover,
+.lr-copy-button:focus-visible {
+  background: #c9f0d6 !important;
+  outline: 2px solid #11722f;
+  outline-offset: 1px;
+}
+.lr-copy-tooltip {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  background: #fff;
+  color: #1f2937;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, .2);
+  direction: rtl;
+  white-space: pre-line;
+  text-align: right;
+  font: 500 12px/1.6 system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  pointer-events: none;
+}
+.lr-copy-tooltip[hidden] { display: none !important; }
+
 /* מצבים (משותף לרכבת ולמחיר למ"ר) */
 .lr-badge[data-state="loading"] { background: #f1f3f5; color: #6b7280; }
 .lr-badge[data-state="near"],
