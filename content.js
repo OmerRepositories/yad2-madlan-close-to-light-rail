@@ -42,10 +42,13 @@
   const LISTING_CACHE_TTL_MS = 60 * 24 * 60 * 60 * 1000;
   const LISTING_CACHE_MAX_ITEMS = 2500;
   const LISTING_CACHE_MAX_BYTES = 4 * 1024 * 1024;
+  const LOCAL_STORAGE_QUOTA_BYTES = 10 * 1024 * 1024;
+  const LOCAL_STORAGE_RESERVE_BYTES = 512 * 1024;
   const SITE_DISABLE_KEY = IS_YAD2 ? "disableYad2" : "disableMadlan";
   let listingCache = {};
   let listingCacheLoaded = false;
   let pendingCacheSave = false;
+  let cacheWriteInProgress = false;
   let cacheSaveTimer = null;
   const cacheWriteSuppressedIds = new Set();
 
@@ -530,7 +533,11 @@
       setBadge(
         b,
         "none",
-        err ? "שגיאה בחישוב" : res && res.message ? res.message : "לא נמצאה כתובת",
+        err
+          ? (res && res.message) || "שגיאה בחישוב"
+          : res && res.message
+            ? res.message
+            : "לא נמצאה כתובת",
         "",
         (err && res.error ? res.error + "\n" : "") + tried
       );
@@ -639,7 +646,19 @@
           scheduleRefresh();
         });
       } catch (err) {
-        renderRail(entry, { ok: false, reason: "error", error: "התוסף עודכן – רענן את הדף" });
+        const detail = err && err.message ? err.message : String(err);
+        const extensionWasReloaded =
+          /extension context invalidated|context invalidated|message port closed/i.test(
+            detail
+          );
+        renderRail(entry, {
+          ok: false,
+          reason: "error",
+          message: extensionWasReloaded
+            ? "התוסף עודכן – רענן את הדף"
+            : "שגיאה בחישוב",
+          error: detail,
+        });
       }
     };
     attempt();
@@ -694,7 +713,11 @@
     );
   }
 
-  function trimListingCache(cache, now = Date.now()) {
+  function trimListingCache(
+    cache,
+    now = Date.now(),
+    maxBytes = LISTING_CACHE_MAX_BYTES
+  ) {
     const fresh = Object.entries(cache || {}).filter(([, record]) =>
       record && (record.recordType === "project" || record.recordType === "listing")
         ? Number.isFinite(record.updatedAt) &&
@@ -708,7 +731,7 @@
     for (const [key, record] of fresh) {
       if (count >= LISTING_CACHE_MAX_ITEMS) break;
       const recordBytes = JSON.stringify([key, record]).length * 2;
-      if (bytes + recordBytes > LISTING_CACHE_MAX_BYTES) continue;
+      if (bytes + recordBytes > maxBytes) continue;
       trimmed[key] = record;
       bytes += recordBytes;
       count++;
@@ -726,14 +749,87 @@
         pendingCacheSave = true;
         return;
       }
+      if (cacheWriteInProgress) {
+        pendingCacheSave = true;
+        return;
+      }
       pendingCacheSave = false;
-      listingCache = trimListingCache(listingCache);
-      chrome.storage.local.set({ [LISTING_CACHE_KEY]: listingCache }, () => {
+      cacheWriteInProgress = true;
+      chrome.storage.local.getBytesInUse(null, (totalBytes) => {
         if (chrome.runtime.lastError) {
-          console.warn("[lightrail-ext] failed to save listing cache", chrome.runtime.lastError.message);
+          cacheWriteInProgress = false;
+          console.warn(
+            "[lightrail-ext] could not measure local storage before saving listing cache",
+            chrome.runtime.lastError.message
+          );
+          if (pendingCacheSave) saveListingCache();
+          return;
         }
+        chrome.storage.local.getBytesInUse(LISTING_CACHE_KEY, (cacheBytes) => {
+          if (chrome.runtime.lastError) {
+            cacheWriteInProgress = false;
+            console.warn(
+              "[lightrail-ext] could not measure existing listing cache",
+              chrome.runtime.lastError.message
+            );
+            if (pendingCacheSave) saveListingCache();
+            return;
+          }
+          const otherBytes = Math.max(0, totalBytes - cacheBytes);
+          const availableBytes =
+            LOCAL_STORAGE_QUOTA_BYTES -
+            otherBytes -
+            LOCAL_STORAGE_RESERVE_BYTES;
+          if (availableBytes < 2 && Object.keys(listingCache).length) {
+            cacheWriteInProgress = false;
+            console.warn(
+              "[lightrail-ext] not enough local storage for listing cache; clear saved extension data or disable cache saving"
+            );
+            if (pendingCacheSave) saveListingCache();
+            return;
+          }
+          const maxBytes = Math.max(
+            2,
+            Math.min(LISTING_CACHE_MAX_BYTES, availableBytes)
+          );
+          writeListingCache(
+            trimListingCache(listingCache, Date.now(), maxBytes),
+            0,
+            maxBytes
+          );
+        });
       });
     }, 500);
+  }
+
+  function writeListingCache(snapshot, attempt, maxBytes) {
+    chrome.storage.local.set({ [LISTING_CACHE_KEY]: snapshot }, () => {
+      const error = chrome.runtime.lastError;
+      if (error) {
+        const quotaError = /quota|exceed|bytes/i.test(error.message || "");
+        if (quotaError && attempt < 4 && Object.keys(snapshot).length > 1) {
+          const reducedBytes = Math.max(2, Math.floor(maxBytes / 2));
+          const reduced = trimListingCache(
+            snapshot,
+            Date.now(),
+            reducedBytes
+          );
+          writeListingCache(reduced, attempt + 1, reducedBytes);
+          return;
+        }
+        console.warn(
+          "[lightrail-ext] failed to save listing cache",
+          error.message
+        );
+      } else {
+        listingCache = snapshot;
+      }
+      cacheWriteInProgress = false;
+      if (pendingCacheSave) {
+        pendingCacheSave = false;
+        saveListingCache();
+      }
+    });
   }
 
   function rememberListingAmenities(
