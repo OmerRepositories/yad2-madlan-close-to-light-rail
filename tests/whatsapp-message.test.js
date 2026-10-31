@@ -36,7 +36,46 @@ test("WhatsApp message clearly marks unavailable listing fields", () => {
 
 test("Floor labels are normalized from Madlan's value-first and label-first layouts", () => {
   assert.equal(LRWhatsAppMessage.normalizeFloor("3\nקומה"), "קומה 3");
+  assert.equal(LRWhatsAppMessage.normalizeFloor("3 חדרים\n3\nקומה\n80 מ״ר"), "קומה 3");
   assert.equal(LRWhatsAppMessage.normalizeFloor("קומה 4"), "קומה 4");
   assert.equal(LRWhatsAppMessage.normalizeFloor("4", true), "קומה 4");
   assert.equal(LRWhatsAppMessage.normalizeFloor("4 חד׳"), null);
+});
+
+test("Madlan detail floor is preferred over unrelated floor fields elsewhere on the page", () => {
+  const floorFields = {
+    '[data-auto="Overview-block"] [data-auto="floor"]': { innerText: "3" },
+    '[data-auto="floor"]': { innerText: "7\nקומה" },
+    '[data-auto="Overview-block"]': { innerText: "3\nקומה" },
+  };
+  const root = {
+    querySelector(selector) {
+      return floorFields[selector] || null;
+    },
+  };
+  assert.equal(
+    LRWhatsAppMessage.readFloor(root, [
+      '[data-auto="Overview-block"] [data-auto="floor"]',
+      '[data-auto="floor"]',
+    ], '[data-auto="Overview-block"]'),
+    "קומה 3"
+  );
+});
+
+test("Madlan floor can be recovered from its overview text when the field is not separately exposed", () => {
+  const root = {
+    querySelector(selector) {
+      return selector === '[data-auto="Overview-block"]'
+        ? { innerText: "3\nחדרים\n3\nקומה\n80\nמ״ר" }
+        : null;
+    },
+  };
+  assert.equal(
+    LRWhatsAppMessage.readFloor(
+      root,
+      ['[data-auto="Overview-block"] [data-auto="floor"]'],
+      '[data-auto="Overview-block"]'
+    ),
+    "קומה 3"
+  );
 });

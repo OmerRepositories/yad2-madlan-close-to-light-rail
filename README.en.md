@@ -2,6 +2,8 @@
 
 [עברית](./README.md)
 
+[Marketing copy](./MARKETING.md) · [Terms of use](./LICENSE.en.md)
+
 The extension displays useful indicators on real-estate listings in search results and on listing pages:
 
 - **Light rail distance**: `450 m` · `🚶 ~7 min walk · 🚉 Dizengoff`

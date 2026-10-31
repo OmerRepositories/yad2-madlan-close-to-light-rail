@@ -24,6 +24,8 @@ The extension is provided “AS IS” and “AS AVAILABLE,” without warranties
 
 Nothing in these terms excludes or limits liability or rights that cannot be excluded or limited under applicable law. If any provision is unenforceable under applicable law, the remaining provisions will remain in effect to the extent possible.
 
+The extension is not approved, operated, sponsored, or supported by Yad2, Madlan, or any other third-party service. Names and trademarks belong to their respective owners and are used only to identify those services. The extension does not grant permission to use any website or bypass access restrictions or terms of use. No statement here guarantees that using the extension will prevent a complaint, warning, account block, access restriction, or claim by a website or rights holder; users must comply with applicable terms and law.
+
 ## Third-party services and content
 
 The extension may link to or use data from third-party services, including Google Maps and OpenStreetMap. Those services are governed by their own terms and policies. The developer is not responsible for third-party content, availability, accuracy, or policies.

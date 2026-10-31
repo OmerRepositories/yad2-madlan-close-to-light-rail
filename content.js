@@ -705,6 +705,7 @@
         ]
       : root === document
         ? [
+            '[data-auto="Overview-block"] [data-auto="floor"]',
             '[data-auto="floor"]',
             '[data-testid="floor"]',
             '[data-auto="property-floor"]',
@@ -714,28 +715,19 @@
             '[data-auto="floor"]',
             '[data-testid="floor"]',
           ];
-    for (const selector of selectors) {
-      const element = root.querySelector(selector);
-      const text = element && String(element.innerText || element.textContent || "").trim();
-      const floor = LRWhatsAppMessage.normalizeFloor(
-        text,
-        Boolean(element && /floor/i.test(selector))
-      );
-      if (floor) return floor;
-    }
+    const floor = LRWhatsAppMessage.readFloor(
+      root,
+      selectors,
+      !IS_YAD2 && root === document ? '[data-auto="Overview-block"]' : null
+    );
+    if (floor) return floor;
 
     const floorDetail = [...root.querySelectorAll('[data-testid="building-text"]')].find(
       (element) => /קומה/.test(element.parentElement?.innerText || "")
     );
-    if (floorDetail) {
-      const floor = LRWhatsAppMessage.normalizeFloor(floorDetail.parentElement.innerText);
-      if (floor) return floor;
-    }
-
-    const cardFloor = !IS_YAD2 && root.querySelector('[data-auto="property-floor"]');
-    const cardText =
-      cardFloor && String(cardFloor.innerText || cardFloor.textContent || "").trim();
-    return LRWhatsAppMessage.normalizeFloor(cardText, Boolean(cardFloor));
+    return floorDetail
+      ? LRWhatsAppMessage.normalizeFloor(floorDetail.parentElement.innerText)
+      : null;
   }
 
   function showCopyTooltip(button, tooltip, entry) {
