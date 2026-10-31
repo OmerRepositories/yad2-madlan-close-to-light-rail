@@ -17,17 +17,33 @@ var LRLocation = (() => {
       : `תחנת הרכבת הקלה ${station}`;
   }
 
-  function listingMapsOrigin(address, queries = []) {
-    const street = String(address && address.street || "").trim();
-    const city = String(address && address.city || "").trim();
+  function isUsableCity(value) {
+    const city = String(value || "").trim();
+    return Boolean(city) && !/מיקומים שנבחרו|נבחרו עד|מיקום נבחר/i.test(city);
+  }
+
+  function listingMapsOrigin(address, queries = [], fallbackCity = "") {
+    const street = String((address && address.street) || "").trim();
+    const city = isUsableCity(address && address.city)
+      ? String(address.city).trim()
+      : isUsableCity(fallbackCity)
+        ? String(fallbackCity).trim()
+        : "";
     if (street && city) return `${street}, ${city}`;
     if (street) {
       const streetQuery = queries.find(
-        (query) => !query.cityOnly && query.q.startsWith(`${street}, `)
+        (query) =>
+          !query.cityOnly &&
+          query.q.startsWith(`${street}, `) &&
+          isUsableCity(query.q.slice(street.length + 2))
       );
       if (streetQuery) return streetQuery.q;
+      return street;
     }
-    return queries.find((query) => !query.cityOnly)?.q || null;
+    return (
+      queries.find((query) => !query.cityOnly && isUsableCity(query.q))?.q ||
+      null
+    );
   }
 
   function mapsDirectionsUrl(origin, destination) {

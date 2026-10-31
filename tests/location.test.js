@@ -45,6 +45,30 @@ test("Google Maps origin uses the listing city instead of unrelated search conte
   assert.equal(url.searchParams.get("origin"), "הרב פינטו מסעוד אשר 4, פתח תקווה");
 });
 
+test("Google Maps origin rejects Yad2 location-filter text and uses page city", () => {
+  const origin = LRLocation.listingMapsOrigin(
+    { street: "חיים צבי גרינשטיין", city: "מיקומים שנבחרו עד 2" },
+    [{ q: "חיים צבי גרינשטיין, מיקומים שנבחרו עד 2" }],
+    "פתח תקווה"
+  );
+  const url = new URL(
+    LRLocation.mapsDirectionsUrl(origin, "תחנת הרכבת הקלה בילינסון")
+  );
+
+  assert.equal(origin, "חיים צבי גרינשטיין, פתח תקווה");
+  assert.equal(url.searchParams.get("origin"), "חיים צבי גרינשטיין, פתח תקווה");
+});
+
+test("Google Maps origin drops filter text when no valid city is available", () => {
+  assert.equal(
+    LRLocation.listingMapsOrigin(
+      { street: "חיים צבי גרינשטיין", city: "מיקומים שנבחרו עד 2" },
+      [{ q: "חיים צבי גרינשטיין, מיקומים שנבחרו עד 2" }]
+    ),
+    "חיים צבי גרינשטיין"
+  );
+});
+
 test("Google Maps station queries do not duplicate an existing station label", () => {
   assert.equal(
     LRLocation.stationMapsQuery("תחנת בילינסון"),

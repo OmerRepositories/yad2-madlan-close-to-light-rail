@@ -568,7 +568,7 @@
       const parsed = siteParser.readAddress(root, text, ctxCity(), entry.kind === "single");
       entry.listingId = siteParser.listingId(root);
       const { queries } = parsed;
-      entry.mapsOrigin = LRLocation.listingMapsOrigin(parsed, queries);
+      entry.mapsOrigin = LRLocation.listingMapsOrigin(parsed, queries, ctxCity());
       if (!queries.length && !LRLocation.validCoordinates(parsed.coordinates)) {
         // ייתכן שהכרטיס עוד לא נטען במלואו – מנסים שוב כמה פעמים
         if (++entry.tries < maxTries) return setTimeout(attempt, 1000);
