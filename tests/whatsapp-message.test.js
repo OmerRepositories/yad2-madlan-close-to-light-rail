@@ -11,7 +11,8 @@ test("WhatsApp message lists all requested property fields in Hebrew", () => {
     rooms: 4,
     floor: "קומה 4",
     pricePerSqm: "₪25,287",
-    railDistance: "כ-450 מ׳ (משוער)",
+    railDistance: "כ-450 מ׳ (מיקום משוער)",
+    url: "https://www.madlan.co.il/listings/test-id",
   });
 
   assert.equal(
@@ -23,14 +24,15 @@ test("WhatsApp message lists all requested property fields in Hebrew", () => {
       "חדרים: 4",
       "קומה: קומה 4",
       'מחיר למ"ר: ₪25,287',
-      "קרבה לרכבת משוערת: כ-450 מ׳ (משוער)",
+      "מרחק בקו אווירי מהרכבת (המרחק בהליכה עשוי להיות גדול יותר): כ-450 מ׳ (מיקום משוער)",
+      "קישור למודעה: https://www.madlan.co.il/listings/test-id",
     ].join("\n")
   );
 });
 
 test("WhatsApp message clearly marks unavailable listing fields", () => {
   const message = LRWhatsAppMessage.format({});
-  assert.equal(message.split("\n").length, 7);
+  assert.equal(message.split("\n").length, 8);
   assert.ok(message.split("\n").every((line) => line.endsWith("לא זוהה")));
 });
 
@@ -77,5 +79,33 @@ test("Madlan floor can be recovered from its overview text when the field is not
       '[data-auto="Overview-block"]'
     ),
     "קומה 3"
+  );
+});
+
+test("Madlan overview reads the value child next to the explicit floor label", () => {
+  const floorValue = { innerText: "16" };
+  const floorLabel = { innerText: "קומה" };
+  const overviewFloor = {
+    firstElementChild: floorValue,
+    children: [floorValue, floorLabel],
+    innerText: "16\nקומה",
+  };
+  const overview = {
+    querySelector(selector) {
+      return selector === '[data-auto="floor"]' ? overviewFloor : null;
+    },
+  };
+  const root = {
+    querySelector(selector) {
+      return selector === '[data-auto="Overview-block"]' ? overview : null;
+    },
+  };
+  assert.equal(
+    LRWhatsAppMessage.readFloor(
+      root,
+      ['[data-auto="Overview-block"] [data-auto="floor"]'],
+      '[data-auto="Overview-block"]'
+    ),
+    "קומה 16"
   );
 });

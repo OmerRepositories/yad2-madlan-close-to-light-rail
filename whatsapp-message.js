@@ -15,6 +15,22 @@ var LRWhatsAppMessage = (() => {
 
   function readFloor(root, selectors, overviewSelector) {
     if (!root || typeof root.querySelector !== "function") return null;
+    const overview = overviewSelector && root.querySelector(overviewSelector);
+    if (overview && typeof overview.querySelector === "function") {
+      const overviewFloor = overview.querySelector('[data-auto="floor"]');
+      if (overviewFloor) {
+        const value = overviewFloor.firstElementChild;
+        const label = overviewFloor.children && overviewFloor.children[1];
+        const labelText = String(label && (label.innerText || label.textContent) || "").trim();
+        const floor = normalizeFloor(
+          value && labelText === "קומה"
+            ? `${value.innerText || value.textContent || ""}\nקומה`
+            : overviewFloor.innerText || overviewFloor.textContent || ""
+        );
+        if (floor) return floor;
+      }
+    }
+
     for (const selector of selectors) {
       const element = root.querySelector(selector);
       const text = element && String(element.innerText || element.textContent || "").trim();
@@ -22,7 +38,6 @@ var LRWhatsAppMessage = (() => {
       if (floor) return floor;
     }
 
-    const overview = overviewSelector && root.querySelector(overviewSelector);
     return overview
       ? normalizeFloor(overview.innerText || overview.textContent || "")
       : null;
@@ -37,7 +52,8 @@ var LRWhatsAppMessage = (() => {
       `חדרים: ${value(data.rooms)}`,
       `קומה: ${value(data.floor)}`,
       `מחיר למ"ר: ${value(data.pricePerSqm)}`,
-      `קרבה לרכבת משוערת: ${value(data.railDistance)}`,
+      `מרחק בקו אווירי מהרכבת (המרחק בהליכה עשוי להיות גדול יותר): ${value(data.railDistance)}`,
+      `קישור למודעה: ${value(data.url)}`,
     ].join("\n");
   }
 

@@ -681,7 +681,7 @@
     const railDistance =
       entry.res && entry.res.ok
         ? `${entry.res.approx ? "כ-" : ""}${fmtDistance(entry.res.meters)}${
-            entry.res.approx ? " (משוער)" : " (מדויק)"
+            entry.res.approx ? " (מיקום משוער)" : ""
           }`
         : null;
     return {
@@ -692,6 +692,7 @@
       floor,
       pricePerSqm: Number.isFinite(stats.ppsm) ? `₪${fmtNum(stats.ppsm)}` : null,
       railDistance,
+      url: parser.listingUrl(root) || location.href,
     };
   }
 
@@ -766,7 +767,13 @@
       } catch (fallbackError) {
         console.warn("[lightrail-ext] clipboard fallback failed", fallbackError);
       } finally {
-        if (textarea && textarea.isConnected) textarea.remove();
+        try {
+          if (textarea && textarea.parentNode) {
+            textarea.parentNode.removeChild(textarea);
+          }
+        } catch (cleanupError) {
+          console.warn("[lightrail-ext] clipboard fallback cleanup failed", cleanupError);
+        }
       }
       if (!copied) {
         console.warn("[lightrail-ext] could not copy WhatsApp listing message", clipboardError);
