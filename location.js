@@ -17,6 +17,19 @@ var LRLocation = (() => {
       : `תחנת הרכבת הקלה ${station}`;
   }
 
+  function listingMapsOrigin(address, queries = []) {
+    const street = String(address && address.street || "").trim();
+    const city = String(address && address.city || "").trim();
+    if (street && city) return `${street}, ${city}`;
+    if (street) {
+      const streetQuery = queries.find(
+        (query) => !query.cityOnly && query.q.startsWith(`${street}, `)
+      );
+      if (streetQuery) return streetQuery.q;
+    }
+    return queries.find((query) => !query.cityOnly)?.q || null;
+  }
+
   function mapsDirectionsUrl(origin, destination) {
     const params = new URLSearchParams({
       api: "1",
@@ -35,7 +48,7 @@ var LRLocation = (() => {
     return `https://www.google.com/maps/dir/?${params}`;
   }
 
-  return { validCoordinates, mapsDirectionsUrl, stationMapsQuery };
+  return { validCoordinates, mapsDirectionsUrl, stationMapsQuery, listingMapsOrigin };
 })();
 
 if (typeof module !== "undefined") module.exports = LRLocation;

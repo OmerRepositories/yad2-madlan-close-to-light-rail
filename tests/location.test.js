@@ -29,6 +29,22 @@ test("Google Maps directions retain coordinate fallback for listings without add
   assert.equal(url.searchParams.get("destination"), "תחנת הרכבת הקלה בילינסון");
 });
 
+test("Google Maps origin uses the listing city instead of unrelated search context", () => {
+  const origin = LRLocation.listingMapsOrigin(
+    { street: "הרב פינטו מסעוד אשר 4", city: "פתח תקווה" },
+    [
+      { q: "הרב פינטו מסעוד אשר 4, מיקומים שנבחרו עד 2" },
+      { q: "הרב פינטו מסעוד אשר 4, פתח תקווה" },
+    ]
+  );
+  const url = new URL(
+    LRLocation.mapsDirectionsUrl(origin, "תחנת הרכבת הקלה בילינסון")
+  );
+
+  assert.equal(origin, "הרב פינטו מסעוד אשר 4, פתח תקווה");
+  assert.equal(url.searchParams.get("origin"), "הרב פינטו מסעוד אשר 4, פתח תקווה");
+});
+
 test("Google Maps station queries do not duplicate an existing station label", () => {
   assert.equal(
     LRLocation.stationMapsQuery("תחנת בילינסון"),
