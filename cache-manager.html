@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>מידע שמור</title>
+  <link rel="stylesheet" href="cache-manager.css">
+</head>
+<body>
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">קרבה לרכבת הקלה</p>
+      <h1>מידע שמור</h1>
+      <p class="intro">צפייה ועריכה של מודעות ופרויקטים שנשמרו במכשיר הזה.</p>
+    </div>
+    <button id="refreshButton" type="button">רענון</button>
+  </header>
+
+  <main>
+    <section class="toolbar" aria-label="סינון מידע שמור">
+      <label class="search-field">
+        <span>חיפוש</span>
+        <input id="searchInput" type="search" placeholder="כותרת, כתובת או מזהה">
+      </label>
+      <label>
+        <span>אתר</span>
+        <select id="siteFilter">
+          <option value="">כל האתרים</option>
+          <option value="yad2">יד2</option>
+          <option value="madlan">מדלן</option>
+        </select>
+      </label>
+      <label>
+        <span>סוג</span>
+        <select id="typeFilter">
+          <option value="">מודעות ופרויקטים</option>
+          <option value="listing">מודעות</option>
+          <option value="project">פרויקטים</option>
+        </select>
+      </label>
+      <span id="recordCount" class="record-count" aria-live="polite"></span>
+    </section>
+
+    <div class="workspace">
+      <section class="record-list" aria-label="רשומות שמורות">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">סוג</th>
+                <th scope="col">אתר</th>
+                <th scope="col">מודעה / פרויקט</th>
+                <th scope="col">חדרים</th>
+                <th scope="col">מחיר</th>
+                <th scope="col">נשמר</th>
+              </tr>
+            </thead>
+            <tbody id="recordRows"></tbody>
+          </table>
+          <p id="emptyState" class="empty-state" hidden>לא נמצאו רשומות מתאימות.</p>
+        </div>
+      </section>
+
+      <section id="detailsPanel" class="details-panel" aria-label="פרטי הרשומה" hidden>
+        <div class="details-heading">
+          <div>
+            <p class="eyebrow">פרטי רשומה</p>
+            <h2 id="detailsTitle">בחירת רשומה</h2>
+          </div>
+          <a id="openListingLink" class="open-link" target="_blank" rel="noopener noreferrer" hidden>פתיחת המקור ↗</a>
+        </div>
+        <p id="editHint" class="edit-hint">שינויים שתשמור יסומנו כעריכה ידנית ולא יידרסו בביקור הבא בעמוד.</p>
+        <form id="recordForm">
+          <div class="form-grid">
+            <label class="wide"><span>כותרת</span><input data-field="title" type="text"></label>
+            <label class="wide"><span>כתובת</span><input data-field="address" type="text"></label>
+            <label><span>עיר</span><input data-field="city" type="text"></label>
+            <label><span>שכונה</span><input data-field="neighborhood" type="text"></label>
+            <label class="wide"><span>קישור</span><input data-field="url" type="url" dir="ltr"></label>
+            <label><span>מחיר</span><input data-field="price" type="number" min="0" step="any"></label>
+            <label><span>מחיר עד</span><input data-field="maxPrice" type="number" min="0" step="any"></label>
+            <label><span>שטח (מ״ר)</span><input data-field="sqm" type="number" min="0" step="any"></label>
+            <label><span>שטח עד (מ״ר)</span><input data-field="maxSqm" type="number" min="0" step="any"></label>
+            <label><span>מחיר למ״ר</span><input data-field="pricePerSqm" type="number" min="0" step="any"></label>
+            <label><span>חדרים</span><input data-field="rooms" type="number" min="0" step="0.5"></label>
+            <label><span>תאריך יצירת מודעה</span><input data-field="listingCreatedAt" type="date"></label>
+            <label><span>תאריך עדכון מודעה</span><input data-field="listingUpdatedAt" type="date"></label>
+            <label><span>מרחק מהרכבת (מ׳)</span><input data-field="railMeters" type="number" min="0" step="1"></label>
+            <label><span>תחנה קרובה</span><input data-field="railStation" type="text"></label>
+            <label><span>קו רוחב</span><input data-field="latitude" type="number" min="-90" max="90" step="any"></label>
+            <label><span>קו אורך</span><input data-field="longitude" type="number" min="-180" max="180" step="any"></label>
+            <label><span>מרחק משוער?</span>
+              <select data-field="railApprox">
+                <option value="">לא ידוע</option>
+                <option value="true">כן</option>
+                <option value="false">לא</option>
+              </select>
+            </label>
+            <label><span>תיווך?</span>
+              <select data-field="brokerage">
+                <option value="">לא ידוע</option>
+                <option value="true">כן</option>
+                <option value="false">לא</option>
+              </select>
+            </label>
+          </div>
+
+          <fieldset>
+            <legend>מאפייני הנכס</legend>
+            <div id="amenityFields" class="amenity-grid"></div>
+          </fieldset>
+
+          <details class="raw-details">
+            <summary>נתונים נוספים (לצפייה)</summary>
+            <pre id="rawRecord"></pre>
+          </details>
+
+          <div class="form-actions">
+            <button id="saveButton" class="primary" type="submit" disabled>שמירת שינויים</button>
+            <span id="saveStatus" role="status" aria-live="polite"></span>
+          </div>
+        </form>
+      </section>
+    </div>
+  </main>
+  <script src="cache-manager.js"></script>
+</body>
+</html>

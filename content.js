@@ -323,9 +323,11 @@
     ) return;
     brokerageFilterBar = document.createElement("div");
     brokerageFilterBar.id = "lr-brokerage-filter";
+    brokerageFilterBar.setAttribute("aria-label", "מסנני מודעות ופרויקטים");
     const brokerageButton = document.createElement("button");
     brokerageButton.type = "button";
-    brokerageButton.textContent = "הסר מודעות תיווך בעמוד זה";
+    brokerageButton.textContent = "הסרת תיווך";
+    brokerageButton.setAttribute("aria-label", "הסרת מודעות תיווך בעמוד זה");
     brokerageButton.addEventListener("click", () => {
       removeBrokerageForPage = true;
       findCards().forEach(processCard);
@@ -338,7 +340,8 @@
     const projectButton = document.createElement("button");
     projectButton.className = "lr-project-filter-button";
     projectButton.type = "button";
-    projectButton.textContent = "הסר פרויקטים בעמוד זה";
+    projectButton.textContent = "הסרת פרויקטים";
+    projectButton.setAttribute("aria-label", "הסרת פרויקטים בעמוד זה");
     projectButton.addEventListener("click", () => {
       removeProjectsForPage = true;
       processProjectCards();
@@ -347,7 +350,7 @@
     projectStatus.className = "lr-project-filter-status";
     projectStatus.setAttribute("aria-live", "polite");
     brokerageFilterBar.append(brokerageButton, brokerageStatus, projectButton, projectStatus);
-    document.body.prepend(brokerageFilterBar);
+    document.body.append(brokerageFilterBar);
   }
 
   // ---------- טקסט של מודעה בודדת ----------
@@ -727,6 +730,17 @@
       return;
     }
     const existing = listingCache[key];
+    const validCoordinates = LRLocation.validCoordinates(coordinates) ? coordinates : null;
+    const manualOverrides = new Set(
+      existing && Array.isArray(existing.manualOverrides) ? existing.manualOverrides : []
+    );
+    const savedAmenities =
+      manualOverrides.has("amenities") && existing && existing.amenities
+        ? existing.amenities
+        : amenities;
+    const savedCoordinates = manualOverrides.has("coordinates")
+      ? existing && existing.coordinates
+      : validCoordinates;
     const existingAmenities =
       existing &&
       existing.amenities &&
@@ -734,15 +748,17 @@
       !Array.isArray(existing.amenities)
         ? existing.amenities
         : {};
-    const validCoordinates = LRLocation.validCoordinates(coordinates) ? coordinates : null;
     const stats = {};
     for (const field of ["price", "sqm", "pricePerSqm"]) {
-      if (listingStats && Number.isFinite(listingStats[field])) {
+      if (manualOverrides.has(field) && existing && field in existing) {
+        stats[field] = existing[field];
+      } else if (listingStats && Number.isFinite(listingStats[field])) {
         stats[field] = listingStats[field];
       }
     }
     if (
       listingStats &&
+      !manualOverrides.has("pricePerSqm") &&
       Number.isFinite(listingStats.price) &&
       Number.isFinite(listingStats.sqm) &&
       !Number.isFinite(listingStats.pricePerSqm)
@@ -754,21 +770,21 @@
     );
     if (
       existing &&
-      Object.keys(amenities).every(
-        (amenity) => existingAmenities[amenity] === amenities[amenity]
+      Object.keys(savedAmenities).every(
+        (amenity) => existingAmenities[amenity] === savedAmenities[amenity]
       ) &&
-      Object.keys(existingAmenities).length === Object.keys(amenities).length &&
-      (!validCoordinates ||
+      Object.keys(existingAmenities).length === Object.keys(savedAmenities).length &&
+      (!savedCoordinates ||
         (existing.coordinates &&
-          existing.coordinates.lat === validCoordinates.lat &&
-          existing.coordinates.lon === validCoordinates.lon)) &&
+          existing.coordinates.lat === savedCoordinates.lat &&
+          existing.coordinates.lon === savedCoordinates.lon)) &&
       (!listingUrl || existing.url === listingUrl) &&
       statsUnchanged
     ) {
       if (refreshTimestamp || Date.now() - existing.updatedAt >= 24 * 60 * 60 * 1000) {
         listingCache[key] = {
           ...existing,
-          ...(validCoordinates ? { coordinates: validCoordinates } : {}),
+          ...(savedCoordinates ? { coordinates: savedCoordinates } : {}),
           ...(listingUrl ? { url: listingUrl } : {}),
           updatedAt: Date.now(),
         };
@@ -778,9 +794,9 @@
     }
     listingCache[key] = {
       ...existing,
-      amenities,
-      ...(validCoordinates ? { coordinates: validCoordinates } : {}),
-      ...(existing && validCachedCoordinates(existing) && !validCoordinates
+      amenities: savedAmenities,
+      ...(savedCoordinates ? { coordinates: savedCoordinates } : {}),
+      ...(existing && validCachedCoordinates(existing) && !savedCoordinates
         ? { coordinates: existing.coordinates }
         : {}),
       ...(listingUrl ? { url: listingUrl } : existing && existing.url ? { url: existing.url } : {}),
@@ -790,18 +806,28 @@
     saveListingCache();
   }
 
+  function preserveManualOverrides(record, previous) {
+    if (!previous || !Array.isArray(previous.manualOverrides)) return record;
+    for (const field of previous.manualOverrides) {
+      if (Object.prototype.hasOwnProperty.call(previous, field)) {
+        record[field] = previous[field];
+      }
+    }
+    return record;
+  }
+
   function rememberProjectData(project) {
     if (!CFG.saveListingData || !listingCacheLoaded || !project || !project.id) return;
     const id = `project-${project.id}`;
     const key = cacheKeyForListing(id);
     if (cacheWriteSuppressedIds.has(key)) return;
     const existing = listingCache[key] || {};
-    const record = {
+    const record = preserveManualOverrides({
       ...existing,
       ...project,
       recordType: "project",
       updatedAt: existing.updatedAt || Date.now(),
-    };
+    }, existing);
     const unchanged = Object.entries(record).every(
       ([field, value]) => field === "updatedAt" || existing[field] === value
     );
@@ -846,7 +872,7 @@
     const listingHeading =
       root.querySelector("h1") ||
       (entry.kind === "list" ? root.querySelector('[data-testid="ad-card-title"]') : null);
-    const record = {
+    const record = preserveManualOverrides({
       ...previous,
       recordType: "listing",
       title: (listingHeading && listingHeading.innerText.trim()) || previous.title || "",
@@ -871,7 +897,7 @@
         previous.listingUpdatedAt,
       brokerage: hasBrokerageSignal(root),
       ...extra,
-    };
+    }, previous);
     const unchanged = Object.entries(record).every(
       ([field, value]) => field === "updatedAt" || previous[field] === value
     );

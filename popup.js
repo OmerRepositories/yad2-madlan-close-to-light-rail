@@ -200,6 +200,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 updateCacheStatus();
 
+$("openCacheManager").addEventListener("click", () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("cache-manager.html") });
+});
+
 async function exportListingCache(format) {
   const buttons = [$("exportListingCacheCsv"), $("exportListingCacheExcel")];
   const status = $("exportStatus");
