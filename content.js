@@ -41,6 +41,7 @@
   const LISTING_CACHE_KEY = "yad2AmenityCache_v1";
   const LISTING_CACHE_TTL_MS = 60 * 24 * 60 * 60 * 1000;
   const LISTING_CACHE_MAX_ITEMS = 2500;
+  const LISTING_CACHE_MAX_BYTES = 4 * 1024 * 1024;
   const SITE_DISABLE_KEY = IS_YAD2 ? "disableYad2" : "disableMadlan";
   let listingCache = {};
   let listingCacheLoaded = false;
@@ -688,7 +689,18 @@
         : validCachedAmenities(record, now)
     );
     fresh.sort((a, b) => b[1].updatedAt - a[1].updatedAt);
-    return Object.fromEntries(fresh.slice(0, LISTING_CACHE_MAX_ITEMS));
+    const trimmed = {};
+    let bytes = 2;
+    let count = 0;
+    for (const [key, record] of fresh) {
+      if (count >= LISTING_CACHE_MAX_ITEMS) break;
+      const recordBytes = JSON.stringify([key, record]).length * 2;
+      if (bytes + recordBytes > LISTING_CACHE_MAX_BYTES) continue;
+      trimmed[key] = record;
+      bytes += recordBytes;
+      count++;
+    }
+    return trimmed;
   }
 
   function saveListingCache() {

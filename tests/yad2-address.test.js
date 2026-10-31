@@ -396,6 +396,109 @@ test("Madlan listing export reads room count and releaseDate from its listing pa
   assert.equal(metadata.listingUpdatedAt, "2026-10-20T12:00:00.000Z");
 });
 
+test("Madlan listing cards use the image alt address instead of promotional badges", () => {
+  const madlanContext = {
+    LR,
+    document: {
+      scripts: [],
+      querySelector: () => null,
+    },
+    URL,
+    location: {
+      pathname: "/realestate/for-sale",
+      href: "https://www.madlan.co.il/realestate/for-sale",
+    },
+  };
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "madlan.js"), "utf8"),
+    madlanContext
+  );
+  const addressImage = { alt: "הירקונים 5, פתח תקווה" };
+  const root = {
+    querySelector(selector) {
+      if (selector === '[data-auto="universal-card-image"][alt]') return addressImage;
+      if (selector === '[data-auto="property-address"]') {
+        return { innerText: "דופלקס, הירקונים, שיפר" };
+      }
+      return null;
+    },
+  };
+
+  const address = madlanContext.LRMadlan.readAddress(
+    root,
+    "Top10 במדד המתווכים",
+    null,
+    false
+  );
+
+  assert.equal(address.street, "הירקונים 5");
+  assert.equal(address.city, "פתח תקווה");
+  assert.ok(address.queries.some((query) => query.q === "הירקונים 5, פתח תקווה"));
+});
+
+test("Madlan listing card fallback ignores the Top10 broker index label", () => {
+  const madlanContext = {
+    LR,
+    document: {
+      scripts: [],
+      querySelector: () => null,
+    },
+    URL,
+    location: {
+      pathname: "/realestate/for-sale",
+      href: "https://www.madlan.co.il/realestate/for-sale",
+    },
+  };
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "madlan.js"), "utf8"),
+    madlanContext
+  );
+  const root = { querySelector: () => null };
+  const address = madlanContext.LRMadlan.readAddress(
+    root,
+    "Top10 במדד המתווכים",
+    null,
+    false
+  );
+  assert.equal(address.street, null);
+  assert.deepEqual(address.queries, []);
+});
+
+test("Madlan detail area extraction accepts a value followed by its unit label", () => {
+  const madlanContext = {
+    LR,
+    document: {
+      scripts: [],
+      querySelector: () => null,
+    },
+    URL,
+    location: {
+      pathname: "/listings/BhAQrcw3hLo",
+      href: "https://www.madlan.co.il/listings/BhAQrcw3hLo",
+    },
+  };
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "madlan.js"), "utf8"),
+    madlanContext
+  );
+  const root = {
+    querySelector(selector) {
+      if (selector === '[data-auto="area"]') {
+        return { innerText: '100\nמ"ר' };
+      }
+      if (selector === '[data-auto="current-price"]') {
+        return { innerText: "‏2,000,000 ‏₪" };
+      }
+      return null;
+    },
+  };
+
+  const stats = madlanContext.LRMadlan.extractPriceSqm(root, "");
+  assert.equal(stats.price, 2000000);
+  assert.equal(stats.sqm, 100);
+  assert.equal(stats.ppsm, 20000);
+});
+
 test("Madlan project pages never geocode the full page text as an address", () => {
   const madlanContext = {
     LR,

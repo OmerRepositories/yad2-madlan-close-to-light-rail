@@ -170,10 +170,18 @@ var LRMadlan = (() => {
     const projectPage = isProjectPage(location.pathname);
     const addressElement = projectPage
       ? root.querySelector('[data-testid="project-address"]')
-      : root.querySelector(
-          '[data-auto="primary_address_text"], [data-testid="address"]'
-        );
-    const addressText = addressElement ? addressElement.innerText : projectPage ? "" : text;
+      : single
+        ? root.querySelector(
+            '[data-auto="primary_address_text"], [data-testid="address"]'
+          )
+        : root.querySelector('[data-auto="universal-card-image"][alt]') ||
+          root.querySelector('[data-auto="property-address"]') ||
+          root.querySelector('[data-auto="primary_address_text"], [data-testid="address"]');
+    const addressText = addressElement
+      ? addressElement.alt || addressElement.innerText
+      : projectPage
+        ? ""
+        : String(text || "").replace(/Top\s*\d+\s*במדד\s*המתווכים/gi, "");
     const parsed = single
       ? LR.parseAny(addressText, ctxCity)
       : LR.parseAddress(addressText, ctxCity);
@@ -192,7 +200,9 @@ var LRMadlan = (() => {
     const areaElement = root.querySelector('[data-auto="area"]');
     if (!areaElement) return LR.extractPriceSqm(text);
 
-    const areaMatch = areaElement.innerText.match(/^\s*(\d{2,4}(?:[.,]\d+)?)\s*$/);
+    const areaMatch = areaElement.innerText.match(
+      /^\s*(\d{2,4}(?:[.,]\d+)?)\s*(?:\D*)$/
+    );
     if (!areaMatch) return LR.extractPriceSqm(text);
 
     const sqm = Number(areaMatch[1].replace(",", "."));
