@@ -32,6 +32,14 @@
 }
 .lr-val { font-weight: 700; }
 .lr-sub { font-weight: 500; opacity: 0.9; }
+.lr-address-note {
+  flex-basis: 100%;
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+}
+.lr-address-note[hidden] { display: none; }
 .lr-label[hidden], .lr-sub[hidden] { display: none; }
 
 /* מצבים (משותף לרכבת ולמחיר למ"ר) */

@@ -225,10 +225,36 @@ var LRYad2 = (() => {
     };
   }
 
+  function addressFromCardDetails(root) {
+    const streetElement = root.querySelector('[data-testid="street-name"]');
+    const locationElement = root.querySelector('[data-testid="item-info-line-1st"]');
+    if (!streetElement || !locationElement) return null;
+
+    const street = streetElement.innerText.trim();
+    const location = LR.parseAddress(locationElement.innerText, null);
+    if (!street || !location.city) return null;
+
+    const hasHouseNumber = /\s\d{1,4}[א-ת]?$/.test(street);
+    return {
+      street,
+      city: location.city,
+      hood: location.hood,
+      queries: [
+        {
+          q: `${street}, ${location.city}`,
+          approx: !hasHouseNumber,
+          bias: false,
+        },
+      ],
+      coordinates: null,
+    };
+  }
+
   function readAddress(root, text, ctxCity, single) {
     const projectPage = isProjectPage(location.pathname);
     const project = projectPage ? projectFromData() : null;
     const place = placeFromData(root);
+    const cardDetails = addressFromCardDetails(root);
     let parsed;
     let coordinates = project ? project.coordinates : null;
     let addressText = text;
@@ -238,6 +264,9 @@ var LRYad2 = (() => {
         (addressElement && addressElement.innerText) ||
         (project ? `${project.street}, ${project.city}` : "");
       parsed = LR.parseAddress(addressText, addressText ? ctxCity : null);
+    } else if (cardDetails) {
+      parsed = cardDetails;
+      coordinates = place ? place.coordinates : null;
     } else if (place) {
       addressText = `${place.street}, ${place.hood || ""}, ${place.city}`;
       parsed = LR.parseAddress(
@@ -255,7 +284,7 @@ var LRYad2 = (() => {
         : LR.parseAddress(addressText, ctxCity);
     }
 
-    if (!single && text) {
+    if (!single && text && !cardDetails) {
       const cardAddress = LR.parseAddress(text, ctxCity);
       const houseNumber = (street) => /\s\d{1,4}[א-ת]?$/.test(street || "");
       const streetName = (street) =>

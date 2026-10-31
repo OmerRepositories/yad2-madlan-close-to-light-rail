@@ -80,6 +80,59 @@ test("Yad2 search cards preserve the displayed house number when structured data
   assert.ok(parsed.queries.some((query) => query.q === "מיכל לייב כץ 64, פתח תקווה"));
 });
 
+test("Yad2 multi-neighborhood cards use each listing's street and city", () => {
+  const listingData = {
+    token: "listing-multi",
+    address: {
+      street: { text: "רחוב שגוי" },
+      house: { number: "9" },
+      city: { text: "עיר שגויה" },
+      coords: { lat: 32.09, lon: 34.89 },
+    },
+  };
+  const cardContext = {
+    LR,
+    URL,
+    document: {
+      querySelector: () => ({
+        textContent: JSON.stringify({
+          props: { pageProps: { listings: [listingData] } },
+        }),
+      }),
+    },
+    location: {
+      pathname: "/realestate/forsale/center-and-sharon",
+      href: "https://www.yad2.co.il/realestate/forsale/center-and-sharon?multiNeighborhood=777%2C766%2C761",
+    },
+  };
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "yad2.js"), "utf8"),
+    cardContext
+  );
+  const card = {
+    querySelector(selector) {
+      if (selector === 'a[href*="/realestate/item/"]') {
+        return { href: "https://www.yad2.co.il/realestate/item/center-and-sharon/listing-multi" };
+      }
+      if (selector === '[data-testid="street-name"]') {
+        return { innerText: "יהושע שטמפפר " };
+      }
+      if (selector === '[data-testid="item-info-line-1st"]') {
+        return { innerText: "דירה, שיפר, פתח תקווה" };
+      }
+      return null;
+    },
+  };
+
+  const address = cardContext.LRYad2.readAddress(card, "", null, false);
+  assert.equal(address.street, "יהושע שטמפפר");
+  assert.equal(address.city, "פתח תקווה");
+  assert.equal(address.hood, "שיפר");
+  assert.equal(address.coordinates.lat, 32.09);
+  assert.equal(address.coordinates.lon, 34.89);
+  assert.equal(address.queries[0].q, "יהושע שטמפפר, פתח תקווה");
+});
+
 test("Yad2 listing export reads rooms and published/updated dates", () => {
   const listingData = {
     token: "v3y00p91",

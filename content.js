@@ -453,6 +453,10 @@
     wrap.className = "lr-wrap" + (kind === "single" ? " lr-float" : "");
 
     const rail = mkBadge("lr-rail", "מרחק מהרכבת");
+    const addressNote = document.createElement("span");
+    addressNote.className = "lr-address-note";
+    addressNote.hidden = true;
+    rail._addressNote = addressNote;
     const ppsm = mkBadge("lr-ppsm", "מחיר למ״ר");
     rail.hidden = !CFG.calculateRail;
     ppsm.hidden = !CFG.calculatePpsm;
@@ -468,7 +472,7 @@
     deal._v.textContent = "⭐ שווה בדיקה";
     setBadge(rail, "loading", "ממתין…");
     setBadge(ppsm, "loading", "…");
-    wrap.append(amenityAlert, cacheNote, rail, ppsm, deal);
+    wrap.append(amenityAlert, cacheNote, rail, addressNote, ppsm, deal);
 
     if (kind === "single") {
       document.body.appendChild(wrap);
@@ -526,6 +530,11 @@
     const state = m <= 600 ? "near" : m <= 1500 ? "mid" : "far";
     const walk = m > 4000 ? "" : `🚶 ~${res.walkMin} דק׳ הליכה · `;
     const sub = `${walk}🚉 ${res.station.name}`;
+    if (b._addressNote) {
+      const address = entry.mapsOrigin || "";
+      b._addressNote.textContent = address ? `הכתובת שאיתרתי: ${address}` : "";
+      b._addressNote.hidden = !address;
+    }
     const title =
       (res.approx
         ? "הערכה בלבד – לא נמצאה כתובת מדויקת (" +
@@ -569,6 +578,12 @@
       entry.listingId = siteParser.listingId(root);
       const { queries } = parsed;
       entry.mapsOrigin = LRLocation.listingMapsOrigin(parsed, queries, ctxCity());
+      if (entry.rail._addressNote) {
+        entry.rail._addressNote.textContent = entry.mapsOrigin
+          ? `הכתובת שאיתרתי: ${entry.mapsOrigin}`
+          : "";
+        entry.rail._addressNote.hidden = !entry.mapsOrigin;
+      }
       if (!queries.length && !LRLocation.validCoordinates(parsed.coordinates)) {
         // ייתכן שהכרטיס עוד לא נטען במלואו – מנסים שוב כמה פעמים
         if (++entry.tries < maxTries) return setTimeout(attempt, 1000);
