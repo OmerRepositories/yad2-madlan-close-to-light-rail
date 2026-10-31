@@ -70,8 +70,9 @@
   let isRunning = false;
   let pageBias = null; // המיקום האחרון שנמצא בדיוק, לעזרה בכתובות בלי עיר
   let storedMedian = null; // חציון מחיר למ"ר מחיפוש אחרון (לדפי מודעה בודדת)
-  let removeBrokerageForPage = false;
-  let removeProjectsForPage = false;
+  let removeBrokerageForPage = null;
+  let removeProjectsForPage = null;
+  let nearRailOnlyForPage = false;
   let brokerageFilterBar = null;
   const projectCards = new Set();
 
@@ -240,23 +241,50 @@
 
   function filterBrokerageEntry(entry) {
     if (entry.kind !== "list") return false;
+    const filterActive = removeBrokerageForPage ?? CFG.removeBrokerage;
     const shouldRemove =
-      (CFG.removeBrokerage || removeBrokerageForPage) && hasBrokerageSignal(entry.card);
+      filterActive && hasBrokerageSignal(entry.card);
     entry.card.classList.toggle("lr-brokerage-removed", shouldRemove);
     entry.brokerageRemoved = shouldRemove;
     return shouldRemove;
   }
 
+  function filterNearRailEntry(entry) {
+    if (entry.kind !== "list") return false;
+    const shouldRemove =
+      nearRailOnlyForPage &&
+      CFG.calculateRail &&
+      entry.res !== null &&
+      !(entry.res.ok && !entry.res.approx && entry.res.meters <= CFG.nearM);
+    entry.card.classList.toggle("lr-not-near-rail", shouldRemove);
+    return shouldRemove;
+  }
+
   function updateBrokerageFilterStatus() {
     if (!brokerageFilterBar) return;
+    const brokerageFilterActive = removeBrokerageForPage ?? CFG.removeBrokerage;
+    const projectFilterActive = removeProjectsForPage ?? CFG.removeProjects;
     const count = [...entries.values()].filter((entry) => entry.brokerageRemoved).length;
     const status = brokerageFilterBar.querySelector(".lr-brokerage-filter-status");
     status.textContent = count
       ? `הוסרו ${count} מודעות תיווך בעמוד`
-      : removeBrokerageForPage || CFG.removeBrokerage
+      : brokerageFilterActive
         ? "לא נמצאו מודעות תיווך"
         : "";
-    brokerageFilterBar.dataset.active = String(removeBrokerageForPage || CFG.removeBrokerage);
+    brokerageFilterBar.dataset.active = String(brokerageFilterActive);
+    const brokerageButton = brokerageFilterBar.querySelector(".lr-brokerage-filter-button");
+    if (brokerageButton) {
+      brokerageButton.textContent = brokerageFilterActive
+        ? "הצגת מודעות תיווך"
+        : "הסרת תיווך";
+      brokerageButton.setAttribute(
+        "aria-label",
+        brokerageFilterActive
+          ? "הצגת מודעות תיווך בעמוד זה"
+          : "הסרת מודעות תיווך בעמוד זה"
+      );
+      brokerageButton.setAttribute("aria-pressed", String(brokerageFilterActive));
+    }
 
     const projectCount = [...projectCards].filter((card) =>
       card.classList.contains("lr-project-removed")
@@ -266,9 +294,44 @@
       ? "סינון פרויקטים לא פעיל בעמוד פרויקטים"
       : projectCount
         ? `הוסרו ${projectCount} פרויקטים בעמוד`
-        : removeProjectsForPage || CFG.removeProjects
+        : projectFilterActive
           ? "לא נמצאו פרויקטים"
           : "";
+    const projectButton = brokerageFilterBar.querySelector(".lr-project-filter-button");
+    if (projectButton) {
+      projectButton.textContent = projectFilterActive
+        ? "הצגת פרויקטים"
+        : "הסרת פרויקטים";
+      projectButton.setAttribute(
+        "aria-label",
+        projectFilterActive ? "הצגת פרויקטים בעמוד זה" : "הסרת פרויקטים בעמוד זה"
+      );
+      projectButton.setAttribute("aria-pressed", String(projectFilterActive));
+    }
+    const railEntries = [...entries.values()].filter((entry) => entry.kind === "list");
+    const railHiddenCount = railEntries.filter((entry) =>
+      entry.card.classList.contains("lr-not-near-rail")
+    ).length;
+    const railStatus = brokerageFilterBar.querySelector(".lr-rail-filter-status");
+    railStatus.textContent = !CFG.calculateRail
+      ? "יש להפעיל חישוב קרבה לרכבת בהגדרות"
+      : nearRailOnlyForPage
+        ? `מוצגות מודעות מדויקות עד ${CFG.nearM} מ׳ · הוסתרו ${railHiddenCount}`
+        : "";
+    const railButton = brokerageFilterBar.querySelector(".lr-rail-filter-button");
+    if (railButton) {
+      railButton.textContent = nearRailOnlyForPage
+        ? "הצגת כל המודעות"
+        : "רק קרוב לרכבת";
+      railButton.setAttribute(
+        "aria-label",
+        nearRailOnlyForPage
+          ? "הצגת כל המודעות בעמוד"
+          : "הצגת מודעות עם מרחק מדויק עד המרחק שהוגדר מהרכבת"
+      );
+      railButton.setAttribute("aria-pressed", String(nearRailOnlyForPage));
+      railButton.disabled = !CFG.calculateRail;
+    }
   }
 
   function isProjectPath(path) {
@@ -319,10 +382,14 @@
     const projectListingPage = isProjectListingPage();
     const projectButton = brokerageFilterBar?.querySelector(".lr-project-filter-button");
     if (projectButton) projectButton.hidden = projectListingPage;
+    const removeProjects = removeProjectsForPage ?? CFG.removeProjects;
     const shouldRemove =
-      !projectListingPage && (CFG.removeProjects || removeProjectsForPage);
+      !projectListingPage && removeProjects;
     for (const card of projectCards) {
       card.classList.toggle("lr-project-removed", shouldRemove);
+    }
+    if (projectButton) {
+      projectButton.setAttribute("aria-pressed", String(removeProjects));
     }
     updateBrokerageFilterStatus();
   }
@@ -337,11 +404,12 @@
     brokerageFilterBar.id = "lr-brokerage-filter";
     brokerageFilterBar.setAttribute("aria-label", "מסנני מודעות ופרויקטים");
     const brokerageButton = document.createElement("button");
+    brokerageButton.className = "lr-brokerage-filter-button";
     brokerageButton.type = "button";
     brokerageButton.textContent = "הסרת תיווך";
     brokerageButton.setAttribute("aria-label", "הסרת מודעות תיווך בעמוד זה");
     brokerageButton.addEventListener("click", () => {
-      removeBrokerageForPage = true;
+      removeBrokerageForPage = !(removeBrokerageForPage ?? CFG.removeBrokerage);
       findCards().forEach(processCard);
       for (const entry of entries.values()) filterBrokerageEntry(entry);
       updateBrokerageFilterStatus();
@@ -355,13 +423,38 @@
     projectButton.textContent = "הסרת פרויקטים";
     projectButton.setAttribute("aria-label", "הסרת פרויקטים בעמוד זה");
     projectButton.addEventListener("click", () => {
-      removeProjectsForPage = true;
+      removeProjectsForPage = !(removeProjectsForPage ?? CFG.removeProjects);
       processProjectCards();
     });
     const projectStatus = document.createElement("span");
     projectStatus.className = "lr-project-filter-status";
     projectStatus.setAttribute("aria-live", "polite");
-    brokerageFilterBar.append(brokerageButton, brokerageStatus, projectButton, projectStatus);
+    const railButton = document.createElement("button");
+    railButton.className = "lr-rail-filter-button";
+    railButton.type = "button";
+    railButton.textContent = "רק קרוב לרכבת";
+    railButton.setAttribute(
+      "aria-label",
+      "הצגת מודעות עם מרחק מדויק עד המרחק שהוגדר מהרכבת"
+    );
+    railButton.setAttribute("aria-pressed", "false");
+    railButton.disabled = !CFG.calculateRail;
+    railButton.addEventListener("click", () => {
+      nearRailOnlyForPage = !nearRailOnlyForPage;
+      for (const entry of entries.values()) filterNearRailEntry(entry);
+      updateBrokerageFilterStatus();
+    });
+    const railStatus = document.createElement("span");
+    railStatus.className = "lr-rail-filter-status";
+    railStatus.setAttribute("aria-live", "polite");
+    brokerageFilterBar.append(
+      brokerageButton,
+      brokerageStatus,
+      projectButton,
+      projectStatus,
+      railButton,
+      railStatus
+    );
     document.body.append(brokerageFilterBar);
   }
 
@@ -488,8 +581,12 @@
     copyButton.setAttribute("aria-describedby", `lr-copy-tooltip-${entries.size}`);
     copyTooltip.id = `lr-copy-tooltip-${entries.size}`;
     const amenityAlert = document.createElement("div");
+    const brokerageWarning = document.createElement("span");
     const cacheNote = document.createElement("div");
     amenityAlert.className = "lr-amenity-alert";
+    brokerageWarning.className = "lr-brokerage-warning";
+    brokerageWarning.textContent = "שים לב: מודעת תיווך";
+    brokerageWarning.hidden = true;
     cacheNote.className = "lr-cache-note";
     amenityAlert.setAttribute("role", "alert");
     amenityAlert.hidden = true;
@@ -500,6 +597,7 @@
     setBadge(ppsm, "loading", "…");
     wrap.append(
       amenityAlert,
+      brokerageWarning,
       cacheNote,
       rail,
       addressNote,
@@ -526,6 +624,7 @@
       copyButton,
       copyTooltip,
       amenityAlert,
+      brokerageWarning,
       cacheNote,
       brokerageRemoved: false,
       cacheRefreshed: false,
@@ -714,6 +813,8 @@
         "",
         (err && res.error ? res.error + "\n" : "") + tried
       );
+      filterNearRailEntry(entry);
+      updateBrokerageFilterStatus();
       return;
     }
 
@@ -747,6 +848,8 @@
       };
     }
     setBadge(b, state, `${res.approx ? "≈" : ""}${fmtDistance(m)}`, sub, title);
+    filterNearRailEntry(entry);
+    updateBrokerageFilterStatus();
   }
 
   // ---------- חישוב רכבת (רק למודעות שנראות / קרובות למסך) ----------
@@ -1337,11 +1440,13 @@
       }
       renderCachedAmenities(entry);
       filterBrokerageEntry(entry);
+      filterNearRailEntry(entry);
       const listingRoot =
         entry.kind === "single"
           ? document.querySelector("main") || document.body
           : entry.card;
       highlightBrokerage(listingRoot, CFG.avoidBrokerage);
+      entry.brokerageWarning.hidden = !hasBrokerageSignal(listingRoot);
       if (entry.kind === "single") {
         const missing = CFG.requiredAmenities
           .filter((amenity) => entry.amenities && entry.amenities[amenity] === false)
@@ -1552,7 +1657,8 @@
           "lr-brokerage-removed",
           "lr-cache-missing",
           "lr-deal-card",
-          "lr-project-removed"
+          "lr-project-removed",
+          "lr-not-near-rail"
         );
         highlightBrokerage(entry.card, false);
       }

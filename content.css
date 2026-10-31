@@ -120,7 +120,14 @@
 .lr-cache-missing { outline: 2px solid #d64545 !important; }
 
 .lr-brokerage-removed,
-.lr-project-removed { display: none !important; }
+.lr-project-removed,
+.lr-not-near-rail { display: none !important; }
+
+.lr-brokerage-warning {
+  color: #b42318;
+  font: 700 11px/1.3 system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+.lr-brokerage-warning[hidden] { display: none !important; }
 
 #lr-brokerage-filter {
   position: fixed !important;
@@ -153,10 +160,20 @@
   cursor: pointer !important;
 }
 #lr-brokerage-filter button:hover { background: #c2410c !important; }
+#lr-brokerage-filter button[aria-pressed="true"] {
+  border-color: #7f1d1d !important;
+  background: #991b1b !important;
+}
+#lr-brokerage-filter button:disabled {
+  opacity: .55;
+  cursor: not-allowed !important;
+}
 .lr-brokerage-filter-status,
-.lr-project-filter-status { color: #7c2d12; }
+.lr-project-filter-status,
+.lr-rail-filter-status { color: #7c2d12; }
 .lr-brokerage-filter-status:empty,
-.lr-project-filter-status:empty { display: none; }
+.lr-project-filter-status:empty,
+.lr-rail-filter-status:empty { display: none; }
 
 /* תיווך במודעה שהמשתמש סימן כפחות מועדף */
 .lr-brokerage-highlight {
