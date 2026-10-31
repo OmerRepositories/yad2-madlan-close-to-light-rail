@@ -384,8 +384,9 @@ test("Madlan listing export reads room count and releaseDate from its listing pa
   );
   const root = {
     querySelector(selector) {
-      return selector === '[data-auto="beds-count"]'
-        ? { innerText: "4 חדרים" }
+      if (selector === '[data-auto="beds-count"]') return null;
+      return selector === '[data-auto="property-rooms"]'
+        ? { innerText: "4 חד׳" }
         : null;
     },
   };
@@ -394,6 +395,50 @@ test("Madlan listing export reads room count and releaseDate from its listing pa
   assert.equal(metadata.rooms, 4);
   assert.equal(metadata.listingCreatedAt, "2026-10-14T08:30:00.000Z");
   assert.equal(metadata.listingUpdatedAt, "2026-10-20T12:00:00.000Z");
+  madlanContext.document.querySelector = (selector) =>
+    selector === '[data-auto="property-rooms"]' ? { innerText: "8 חד׳" } : null;
+  assert.equal(madlanContext.LRMadlan.listingExportData(madlanContext.document).rooms, null);
+});
+
+test("Madlan search context uses a single city and ignores combined-area searches", () => {
+  const madlanContext = {
+    LR,
+    document: {
+      scripts: [],
+      querySelector: () => null,
+    },
+    URL,
+    location: {
+      pathname: "/for-sale/שכונה-שיפר-פתח-תקווה-ישראל",
+      href: "https://www.madlan.co.il/for-sale/שכונה-שיפר-פתח-תקווה-ישראל",
+    },
+  };
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "madlan.js"), "utf8"),
+    madlanContext
+  );
+
+  assert.equal(
+    madlanContext.LRMadlan.searchCityContext(
+      "/for-sale/שכונה-שיפר-פתח-תקווה-ישראל",
+      "דירות למכירה בשיפר, פתח תקווה - 86 דירות"
+    ),
+    "פתח תקווה"
+  );
+  assert.equal(
+    madlanContext.LRMadlan.searchCityContext(
+      "/for-sale/שכונה-שיפר-פתח-תקווה-ישראל,בת-ים-ישראל",
+      "דירות למכירה בשיפר, פתח תקווה ובת ים"
+    ),
+    null
+  );
+  assert.equal(
+    madlanContext.LRMadlan.searchCityContext(
+      "/for-sale/רפאלי-שרגא-פתח-תקווה-ישראל",
+      "דירות למכירה ברחוב רפאלי שרגא, פתח תקווה"
+    ),
+    "פתח תקווה"
+  );
 });
 
 test("Madlan listing cards use the image alt address instead of promotional badges", () => {
@@ -434,6 +479,87 @@ test("Madlan listing cards use the image alt address instead of promotional badg
   assert.equal(address.street, "הירקונים 5");
   assert.equal(address.city, "פתח תקווה");
   assert.ok(address.queries.some((query) => query.q === "הירקונים 5, פתח תקווה"));
+});
+
+test("Madlan card falls back from an empty image alt to its structured address", () => {
+  const madlanContext = {
+    LR,
+    document: {
+      scripts: [],
+      querySelector: () => null,
+    },
+    URL,
+    location: {
+      pathname: "/for-sale/שכונה-שיפר-פתח-תקווה-ישראל",
+      href: "https://www.madlan.co.il/for-sale/שכונה-שיפר-פתח-תקווה-ישראל",
+    },
+  };
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "madlan.js"), "utf8"),
+    madlanContext
+  );
+  const root = {
+    querySelector(selector) {
+      if (selector === '[data-auto="universal-card-image"][alt]') {
+        return { alt: "" };
+      }
+      if (selector === '[data-auto="property-address"]') {
+        return { innerText: "דירה, הירקונים 11, שיפר" };
+      }
+      return null;
+    },
+  };
+
+  const address = madlanContext.LRMadlan.readAddress(
+    root,
+    "Top10 במדד המתווכים",
+    "פתח תקווה",
+    false
+  );
+  assert.equal(address.street, "הירקונים 11");
+  assert.equal(address.city, "פתח תקווה");
+  assert.equal(address.hood, "שיפר");
+  assert.ok(address.queries.some((query) => query.q === "הירקונים 11, פתח תקווה"));
+});
+
+test("Madlan combined-area cards without a city or exact coordinates are not geocoded", () => {
+  const madlanContext = {
+    LR,
+    document: {
+      scripts: [],
+      querySelector: () => null,
+    },
+    URL,
+    location: {
+      pathname: "/for-sale/שכונה-שיפר-פתח-תקווה-ישראל,בת-ים-ישראל",
+      href: "https://www.madlan.co.il/for-sale/שכונה-שיפר-פתח-תקווה-ישראל,בת-ים-ישראל",
+    },
+  };
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "madlan.js"), "utf8"),
+    madlanContext
+  );
+  const root = {
+    querySelector(selector) {
+      if (selector === '[data-auto="universal-card-image"][alt]') {
+        return { alt: "" };
+      }
+      if (selector === '[data-auto="property-address"]') {
+        return { innerText: "דירה, רחוב לדוגמה 12, שכונה לדוגמה" };
+      }
+      return null;
+    },
+  };
+
+  const address = madlanContext.LRMadlan.readAddress(
+    root,
+    "דירה, רחוב לדוגמה 12, שכונה לדוגמה",
+    null,
+    false
+  );
+  assert.equal(address.street, "לדוגמה 12");
+  assert.equal(address.city, null);
+  assert.equal(address.queries.length, 0);
 });
 
 test("Madlan listing card fallback ignores the Top10 broker index label", () => {
@@ -497,6 +623,108 @@ test("Madlan detail area extraction accepts a value followed by its unit label",
   assert.equal(stats.price, 2000000);
   assert.equal(stats.sqm, 100);
   assert.equal(stats.ppsm, 20000);
+});
+
+test("Madlan listing cards use structured price and area fields", () => {
+  const madlanContext = {
+    LR,
+    document: {
+      scripts: [],
+      querySelector: () => null,
+    },
+    URL,
+    location: {
+      pathname: "/for-sale/שכונה-שיפר-פתח-תקווה-ישראל",
+      href: "https://www.madlan.co.il/for-sale/שכונה-שיפר-פתח-תקווה-ישראל",
+    },
+  };
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "madlan.js"), "utf8"),
+    madlanContext
+  );
+  const root = {
+    querySelector(selector) {
+      if (selector === '[data-auto="property-size"]') return { innerText: '138 מ"ר' };
+      if (selector === '[data-auto="property-price"]') return { innerText: "‏2,950,000 ‏₪" };
+      return null;
+    },
+  };
+
+  const stats = madlanContext.LRMadlan.extractPriceSqm(
+    root,
+    "Top10 במדד המתווכים"
+  );
+  assert.equal(stats.price, 2950000);
+  assert.equal(stats.sqm, 138);
+  assert.equal(stats.ppsm, Math.round(2950000 / 138));
+
+  madlanContext.document.querySelector = (selector) => {
+    if (selector === '[data-auto="area"]') return { innerText: '100 מ"ר' };
+    if (selector === '[data-auto="property-size"]') return { innerText: '90 מ"ר' };
+    if (selector === '[data-auto="current-price"]') return { innerText: "‏2,000,000 ‏₪" };
+    if (selector === '[data-auto="property-price"]') return { innerText: "‏1,000,000 ‏₪" };
+    return null;
+  };
+  const detailStats = madlanContext.LRMadlan.extractPriceSqm(
+    madlanContext.document,
+    ""
+  );
+  assert.equal(detailStats.price, 2000000);
+  assert.equal(detailStats.sqm, 100);
+});
+
+test("Madlan listing cards prefer structured coordinates and address from hydrated listing data", () => {
+  const listingId = "listing-with-exact-address";
+  const madlanContext = {
+    LR,
+    document: {
+      scripts: [
+        {
+          textContent: JSON.stringify({
+            id: listingId,
+            locationPoint: { lat: 32.09826820371908, lng: 34.89619280439136 },
+            addressDetails: {
+              city: "פתח תקווה",
+              streetName: "הירקונים",
+              streetNumber: "9",
+            },
+          }),
+        },
+      ],
+      querySelector: () => null,
+    },
+    URL,
+    location: {
+      pathname: "/for-sale/שכונה-שיפר-פתח-תקווה-ישראל",
+      href: "https://www.madlan.co.il/for-sale/שכונה-שיפר-פתח-תקווה-ישראל",
+    },
+  };
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "madlan.js"), "utf8"),
+    madlanContext
+  );
+  const link = {
+    href: `https://www.madlan.co.il/listings/${listingId}`,
+  };
+  const root = {
+    querySelector(selector) {
+      return selector.includes("listed-bulletin-clickable") ? link : null;
+    },
+    querySelectorAll: () => [],
+  };
+
+  const address = madlanContext.LRMadlan.readAddress(
+    root,
+    "דירה, הירקונים 9, שיפר",
+    null,
+    false
+  );
+  assert.equal(address.street, "הירקונים 9");
+  assert.equal(address.city, "פתח תקווה");
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(address.coordinates)),
+    { lat: 32.09826820371908, lon: 34.89619280439136 }
+  );
 });
 
 test("Madlan project pages never geocode the full page text as an address", () => {

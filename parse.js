@@ -95,6 +95,10 @@ var LR = (() => {
     const h = findCityHit(text);
     return h ? h.canon : null;
   };
+  function findCities(text) {
+    const t = normQuotes(text);
+    return [...new Set(cityRes.filter((city) => city.re.test(t)).map((city) => city.canon))];
+  }
 
   // ---------- בניית שאילתות גיאוקוד ----------
   // מחזיר [{ q, approx, bias }] לפי סדר עדיפות.
@@ -462,6 +466,7 @@ var LR = (() => {
     extractPriceSqmFree: (t) => sanity(extractPriceSqmFree(t)),
     hasExplicitFacebookAddress,
     findCity,
+    findCities,
   };
 })();
 

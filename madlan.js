@@ -5,6 +5,13 @@ var LRMadlan = (() => {
       const pageMatch = location.pathname.match(/\/(?:listings|bulletin)\/([^/]+)/);
       if (pageMatch) return pageMatch[1];
     }
+    const card = root.closest
+      ? root.closest("[data-auto='listed-bulletin'][data-auto-bulletin-id]")
+      : root.matches && root.matches("[data-auto='listed-bulletin'][data-auto-bulletin-id]")
+        ? root
+        : null;
+    const cardId = card && card.getAttribute("data-auto-bulletin-id");
+    if (cardId) return cardId;
     const listingLink = root.querySelector
       ? root.querySelector('a[data-auto="listed-bulletin-clickable"][href], a[href*="/listings/"]')
       : null;
@@ -63,7 +70,9 @@ var LRMadlan = (() => {
   }
 
   function listingExportData(root) {
-    const roomsElement = root.querySelector('[data-auto="beds-count"]');
+    const roomsElement =
+      root.querySelector('[data-auto="beds-count"]') ||
+      (root === document ? null : root.querySelector('[data-auto="property-rooms"]'));
     const roomsMatch = roomsElement && roomsElement.innerText.match(/\d+(?:[.,]\d+)?/);
     const rooms = roomsMatch ? Number(roomsMatch[0].replace(",", ".")) : null;
     const id = listingId(root);
@@ -83,6 +92,22 @@ var LRMadlan = (() => {
 
   function isProjectListingPage(path) {
     return /^\/projects-for-(?:sale|rent)(?:\/|$)/i.test(path);
+  }
+
+  function searchCityContext(path, title) {
+    if (!/^\/for-(?:sale|rent)(?:\/|$)/i.test(path)) return null;
+    try {
+      const segment = decodeURIComponent(path).split("/").filter(Boolean)[1] || "";
+      if (segment.includes(",")) return null;
+      const pathCities = LR.findCities(segment);
+      if (pathCities.length === 1) return pathCities[0];
+      if (pathCities.length > 1) return null;
+    } catch {}
+
+    const titleText = String(title || "");
+    if (!/(?:למכירה|להשכרה)/.test(titleText)) return null;
+    const titleCities = LR.findCities(titleText);
+    return titleCities.length === 1 ? titleCities[0] : null;
   }
 
   function projectExportData(root, text) {
@@ -168,23 +193,57 @@ var LRMadlan = (() => {
   function readAddress(root, text, ctxCity, single) {
     const data = listingData(root);
     const projectPage = isProjectPage(location.pathname);
+    const imageElement =
+      !projectPage && !single
+        ? root.querySelector('[data-auto="universal-card-image"][alt]')
+        : null;
+    const imageAddress = String((imageElement && imageElement.alt) || "").trim();
+    const propertyAddressElement =
+      !projectPage && !single ? root.querySelector('[data-auto="property-address"]') : null;
+    const usePropertyAddress = !imageAddress && Boolean(propertyAddressElement);
     const addressElement = projectPage
       ? root.querySelector('[data-testid="project-address"]')
       : single
         ? root.querySelector(
             '[data-auto="primary_address_text"], [data-testid="address"]'
           )
-        : root.querySelector('[data-auto="universal-card-image"][alt]') ||
-          root.querySelector('[data-auto="property-address"]') ||
-          root.querySelector('[data-auto="primary_address_text"], [data-testid="address"]');
-    const addressText = addressElement
-      ? addressElement.alt || addressElement.innerText
-      : projectPage
-        ? ""
-        : String(text || "").replace(/Top\s*\d+\s*במדד\s*המתווכים/gi, "");
+        : imageAddress
+          ? imageElement
+          : propertyAddressElement ||
+            root.querySelector('[data-auto="primary_address_text"], [data-testid="address"]');
+    const addressText = imageAddress
+      ? imageAddress
+      : addressElement
+        ? addressElement.innerText || addressElement.textContent || ""
+        : projectPage
+          ? ""
+          : String(text || "").replace(/Top\s*\d+\s*במדד\s*המתווכים/gi, "");
     const parsed = single
       ? LR.parseAny(addressText, ctxCity)
       : LR.parseAddress(addressText, ctxCity);
+    if (usePropertyAddress && !(data && data.street && data.number && data.city)) {
+      const cardAddress = LR.parseAddress(addressText, null);
+      const hood = cardAddress.hood || cardAddress.city;
+      const city = (data && data.city) || ctxCity;
+      if (city) {
+        const withCity = cardAddress.street
+          ? LR.parseAddress(`${cardAddress.street}, ${city}`, city)
+          : LR.parseAddress(city, city);
+        return {
+          ...withCity,
+          city,
+          hood,
+          coordinates: (data && data.coordinates) || null,
+        };
+      }
+      return {
+        ...cardAddress,
+        city: data && data.city ? data.city : null,
+        hood,
+        queries: [],
+        coordinates: data && data.coordinates ? data.coordinates : null,
+      };
+    }
     if (!data) return { ...parsed, coordinates: null };
     if (data.street && data.number && data.city) {
       const structured = LR.parseAddress(
@@ -197,21 +256,38 @@ var LRMadlan = (() => {
   }
 
   function extractPriceSqm(root, text) {
-    const areaElement = root.querySelector('[data-auto="area"]');
+    const areaElement =
+      root === document
+        ? root.querySelector('[data-auto="area"]')
+        : root.querySelector('[data-auto="property-size"]') ||
+          root.querySelector('[data-auto="area"]');
     if (!areaElement) return LR.extractPriceSqm(text);
 
-    const areaMatch = areaElement.innerText.match(
-      /^\s*(\d{2,4}(?:[.,]\d+)?)\s*(?:\D*)$/
+    const areaMatch = String(areaElement.innerText || areaElement.textContent || "")
+      .replace(/[\u200e\u200f\u202a-\u202e]/g, "")
+      .match(
+        /^\s*(\d{1,3}(?:,\d{3})+|\d{2,4}(?:[.,]\d+)?)\s*(?:מ["״”'׳]?ר)?\s*$/i
     );
     if (!areaMatch) return LR.extractPriceSqm(text);
 
-    const sqm = Number(areaMatch[1].replace(",", "."));
-    if (!Number.isFinite(sqm) || sqm < 15 || sqm > 1000) return LR.extractPriceSqm(text);
+    const areaText = areaMatch[1];
+    const normalizedArea = /^\d{1,3}(?:,\d{3})+$/.test(areaText)
+      ? areaText.replace(/,/g, "")
+      : areaText.replace(",", ".");
+    const normalizedSqm = Number(normalizedArea);
+    if (!Number.isFinite(normalizedSqm) || normalizedSqm < 15 || normalizedSqm > 1000) {
+      return LR.extractPriceSqm(text);
+    }
 
-    const priceElement = root.querySelector('[data-auto="current-price"]');
+    const priceElement =
+      root === document
+        ? root.querySelector('[data-auto="current-price"]') ||
+          root.querySelector('[data-auto="property-price"]')
+        : root.querySelector('[data-auto="property-price"]') ||
+          root.querySelector('[data-auto="current-price"]');
     const sourceText = priceElement
-      ? `${priceElement.innerText}\n${sqm} מ״ר`
-      : `${text}\n${sqm} מ״ר`;
+      ? `${priceElement.innerText || priceElement.textContent}\n${normalizedSqm} מ״ר`
+      : `${text}\n${normalizedSqm} מ״ר`;
     return LR.extractPriceSqm(sourceText);
   }
 
@@ -249,6 +325,7 @@ var LRMadlan = (() => {
     listingId,
     listingUrl,
     readAddress,
+    searchCityContext,
     listingExportData,
     projectExportData,
     extractPriceSqm,

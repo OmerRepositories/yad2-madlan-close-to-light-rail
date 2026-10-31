@@ -99,6 +99,14 @@
   };
 
   function ctxCity() {
+    if (!IS_YAD2) {
+      const h1 = document.querySelector("h1");
+      return LRMadlan.searchCityContext(
+        location.pathname,
+        [h1 ? h1.innerText : "", document.title || ""].filter(Boolean).join(" ")
+      );
+    }
+
     // 1) סגמנט בעברית בנתיב (מדלן: /for-sale/פתח-תקווה-ישראל)
     try {
       const segs = decodeURIComponent(location.pathname).split("/").filter(Boolean);
@@ -581,7 +589,12 @@
       const parsed = siteParser.readAddress(root, text, ctxCity(), entry.kind === "single");
       entry.listingId = siteParser.listingId(root);
       const { queries } = parsed;
-      entry.mapsOrigin = LRLocation.listingMapsOrigin(parsed, queries, ctxCity());
+      entry.mapsOrigin =
+        !IS_YAD2 &&
+        LRLocation.validCoordinates(parsed.coordinates) &&
+        (!parsed.street || !parsed.city)
+          ? `${parsed.coordinates.lat},${parsed.coordinates.lon}`
+          : LRLocation.listingMapsOrigin(parsed, queries, ctxCity());
       if (entry.rail._addressNote) {
         entry.rail._addressNote.textContent = entry.mapsOrigin
           ? `הכתובת שאיתרתי: ${entry.mapsOrigin}`
