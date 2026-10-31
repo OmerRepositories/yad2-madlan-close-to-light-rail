@@ -718,12 +718,23 @@
     now = Date.now(),
     maxBytes = LISTING_CACHE_MAX_BYTES
   ) {
-    const fresh = Object.entries(cache || {}).filter(([, record]) =>
-      record && (record.recordType === "project" || record.recordType === "listing")
-        ? Number.isFinite(record.updatedAt) &&
+    const entries =
+      cache && typeof cache === "object" && !Array.isArray(cache)
+        ? Object.entries(cache)
+        : [];
+    const fresh = entries.filter((entry) => {
+      const record = entry[1];
+      if (!record || typeof record !== "object" || Array.isArray(record)) {
+        return false;
+      }
+      if (record.recordType === "project" || record.recordType === "listing") {
+        return (
+          Number.isFinite(record.updatedAt) &&
           now - record.updatedAt < LISTING_CACHE_TTL_MS
-        : validCachedAmenities(record, now)
-    );
+        );
+      }
+      return validCachedAmenities(record, now);
+    });
     fresh.sort((a, b) => b[1].updatedAt - a[1].updatedAt);
     const trimmed = {};
     let bytes = 2;
