@@ -718,12 +718,11 @@
     now = Date.now(),
     maxBytes = LISTING_CACHE_MAX_BYTES
   ) {
-    const entries =
+    const records =
       cache && typeof cache === "object" && !Array.isArray(cache)
-        ? Object.entries(cache)
+        ? Object.keys(cache).map((key) => ({ key, record: cache[key] }))
         : [];
-    const fresh = entries.filter((entry) => {
-      const record = entry[1];
+    const fresh = records.filter(({ record }) => {
       if (!record || typeof record !== "object" || Array.isArray(record)) {
         return false;
       }
@@ -735,11 +734,11 @@
       }
       return validCachedAmenities(record, now);
     });
-    fresh.sort((a, b) => b[1].updatedAt - a[1].updatedAt);
+    fresh.sort((a, b) => b.record.updatedAt - a.record.updatedAt);
     const trimmed = {};
     let bytes = 2;
     let count = 0;
-    for (const [key, record] of fresh) {
+    for (const { key, record } of fresh) {
       if (count >= LISTING_CACHE_MAX_ITEMS) break;
       const recordBytes = JSON.stringify([key, record]).length * 2;
       if (bytes + recordBytes > maxBytes) continue;
